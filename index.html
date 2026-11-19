@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b2a41">
+<title>Modeler My ArQ · editor de planos</title>
+<style>
+:root{--bg:#eef0f3;--pan:#fff;--ink:#1c2430;--mut:#667085;--line:#d8dce3;--acc:#1b57e4;--acc2:#e8eefc;--red:#c0392b;--hd:#1b2a41}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+header{background:var(--hd);color:#fff;display:flex;align-items:center;gap:6px;padding:6px 10px;flex-wrap:wrap}
+header h1{font-size:15px;margin:0 8px 0 0;font-weight:700;letter-spacing:.2px;white-space:nowrap}
+header h1 small{font-weight:400;opacity:.65;margin-left:6px}
+header .sp{flex:1}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 10px;cursor:pointer;min-height:30px}
+button:hover{border-color:#aab3c2}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.danger{color:var(--red)}
+button:disabled{opacity:.4;cursor:default}
+header button{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25)}
+header button:hover{background:rgba(255,255,255,.2)}
+header button.pri{background:var(--acc);border-color:var(--acc)}
+main{flex:1;display:flex;min-height:0}
+#panel{width:390px;max-width:46vw;background:var(--pan);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+#tabs{display:flex;border-bottom:1px solid var(--line)}
+#tabs button{flex:1;border:0;border-radius:0;border-bottom:3px solid transparent;background:none;padding:9px 4px;font-weight:600;color:var(--mut)}
+#tabs button.on{color:var(--acc);border-bottom-color:var(--acc);background:var(--acc2)}
+.tab{display:none;overflow:auto;padding:10px;flex:1;min-height:0}
+.tab.on{display:block}
+h3{margin:12px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+h3:first-child{margin-top:0}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;color:var(--mut);text-align:left;padding:2px 3px;font-weight:600}
+td{padding:2px 2px}
+tr.sel td{background:var(--acc2)}
+input[type=text],input[type=number],input:not([type]),select,textarea{border:1px solid var(--line);border-radius:6px;padding:4px 6px;min-height:30px;width:100%;background:#fff}
+input.n{text-align:right;font-variant-numeric:tabular-nums}
+input.nm{font-weight:700;min-width:52px}
+input[type=color]{width:34px;height:30px;padding:1px;border:1px solid var(--line);border-radius:6px;background:#fff}
+input[type=checkbox]{width:auto;min-height:0}
+button.x{padding:2px 8px;min-height:28px;color:var(--red)}
+.row{display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap}
+.row>label{font-size:12px;color:var(--mut)}
+.lot{border:1px solid var(--line);border-radius:9px;padding:8px;margin:8px 0}
+.lot.sel{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc2)}
+.lot .stats{font-size:12px;color:var(--mut);margin:4px 0}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
+.chip{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:14px;padding:1px 4px 1px 8px;background:#fafbfc;font-weight:600;font-size:12px}
+.chip button{border:0;background:none;padding:0 3px;min-height:20px;color:var(--mut)}
+.hint{font-size:12px;color:var(--mut)}
+.box{background:#f6f8fb;border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0}
+#stage{flex:1;position:relative;min-width:0;background:#fff}
+#tools{position:absolute;left:8px;top:8px;display:flex;gap:4px;flex-wrap:wrap;z-index:5;max-width:calc(100% - 16px)}
+#tools button{box-shadow:0 1px 3px rgba(0,0,0,.12)}
+#view{width:100%;height:100%;display:block;touch-action:none;background:#fff;cursor:default}
+#status{position:absolute;left:8px;bottom:6px;font-size:12px;background:rgba(255,255,255,.88);padding:2px 8px;border-radius:6px;color:var(--mut);z-index:5;pointer-events:none}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1c2430;color:#fff;padding:8px 14px;border-radius:8px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:.95}
+#sheetModal{position:fixed;inset:0;background:rgba(20,28,40,.78);z-index:40;display:none;flex-direction:column}
+#sheetModal.on{display:flex}
+#sheetModal .mbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:var(--hd);align-items:center}
+#sheetModal .mbar span{color:#fff;font-weight:700;margin-right:auto}
+#sheetWrap{flex:1;overflow:auto;padding:12px;text-align:center}
+#sheetWrap svg{background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.4);max-width:100%;height:auto}
+@media (max-width:820px){
+  header{gap:4px;padding:5px 6px}
+  header h1 small{display:none}
+  header button{padding:3px 8px;min-height:28px;font-size:13px}
+  #tools button{padding:3px 8px;min-height:28px;font-size:13px}
+  body{overflow:auto}
+  main{flex-direction:column}
+  #panel{width:100%;max-width:none;border-right:0;border-top:1px solid var(--line);order:2;min-height:60vh}
+  #stage{order:1;height:52vh;flex:none}
+  input,select,textarea{font-size:16px!important}
+}
+@media print{
+  body.sheetopen>*:not(#sheetModal){display:none!important}
+  #sheetModal{position:static!important;display:block!important;background:none!important}
+  #sheetModal .mbar{display:none!important}
+  #sheetWrap{overflow:visible!important;padding:0!important}
+  #sheetWrap svg{box-shadow:none!important;width:100%!important;height:auto!important;max-width:none!important}
+  body{overflow:visible;display:block;background:#fff}
+}
+</style>
+<style id="pagecss"></style>
+</head>
+<body>
+<header>
+  <h1>Modeler My ArQ<small>editor de planos</small></h1>
+  <button id="bOpen" title="Abrir proyecto (.json), KML o CSV">Abrir…</button>
+  <button id="bSave" class="pri" title="Guardar proyecto (.json)">Guardar</button>
+  <button id="bUndo" title="Deshacer (Ctrl/Cmd+Z)">↶</button>
+  <button id="bRedo" title="Rehacer (Ctrl/Cmd+Shift+Z)">↷</button>
+  <button id="bNew" title="Proyecto nuevo">Nuevo</button>
+  <span class="sp"></span>
+  <button id="bSheet" class="pri">Ver plano / Exportar</button>
+  <input type="file" id="fileIn" accept=".json,.kml,.csv,.txt,application/json" hidden>
+</header>
+<main>
+  <aside id="panel">
+    <div id="tabs">
+      <button data-tab="puntos" class="on">Puntos</button>
+      <button data-tab="lotes">Lotes</button>
+      <button data-tab="renum">Renumerar</button>
+      <button data-tab="hoja">Hoja</button>
+    </div>
+    <section class="tab on" id="tab-puntos"></section>
+    <section class="tab" id="tab-lotes"></section>
+    <section class="tab" id="tab-renum"></section>
+    <section class="tab" id="tab-hoja"></section>
+  </aside>
+  <div id="stage">
+    <div id="tools">
+      <button data-mode="mover" class="on" title="Seleccionar, arrastrar puntos y mover el plano">☝ Mover</button>
+      <button data-mode="agregar" title="Toca el plano para agregar un punto">＋ Punto</button>
+      <button data-mode="lote" title="Toca los puntos en orden para trazar un lote">⬠ Trazar lote</button>
+      <button data-mode="fusionar" title="Toca un punto y luego otro: el segundo se fusiona en el primero">⧉ Fusionar</button>
+      <button data-mode="medir" title="Toca dos puntos para medir distancia y azimut">📏 Medir</button>
+      <button id="bFit" title="Ajustar vista">⤢</button>
+      <button id="bZin">＋</button><button id="bZout">－</button>
+    </div>
+    <svg id="view" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="status"></div>
+  </div>
+</main>
+<div id="sheetModal">
+  <div class="mbar">
+    <span>Plano completo</span>
+    <button id="xPdf" class="pri">PDF (imprimir)</button>
+    <button id="xPng">PNG</button>
+    <button id="xSvg">SVG</button>
+    <button id="xDxf">DXF</button>
+    <button id="xKml">KML</button>
+    <button id="xCsv">CSV</button>
+    <button id="xJson">Proyecto .json</button>
+    <button id="xClose">Cerrar</button>
+  </div>
+  <div id="sheetWrap"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Modeler My ArQ — editor de planos topográficos (GTM / WGS 84)
+   Página independiente, sin dependencias. Todo corre en el navegador.
+   ===================================================================== */
+
+// ---------- utilidades ----------
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const x = parseFloat(String(v).trim().replace(',', '.')); return isFinite(x) ? x : NaN; };
+const r2 = x => Math.round(x * 100) / 100;
+function fmt(x, d = 2) {
+  if (!isFinite(x)) return '—';
+  const s = Math.abs(x).toFixed(d), [i, f] = s.split('.');
+  return (x < 0 ? '-' : '') + i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (f ? '.' + f : '');
+}
+const VARA2 = 0.698737;      // 1 vara² en m²
+const MANZANA = 6987.37;     // 1 manzana = 10,000 varas² en m²
+
+// ---------- proyección GTM (Transverse Mercator, WGS 84) ----------
+const GTM = { a: 6378137, f: 1 / 298.257223563, lon0: -90.5, k0: 0.9998, fe: 500000, fn: 0 };
+const TM = (() => {
+  const n = GTM.f / (2 - GTM.f), n2 = n * n, n3 = n2 * n, n4 = n3 * n;
+  return {
+    n,
+    A: GTM.a / (1 + n) * (1 + n2 / 4 + n4 / 64),
+    al: [n / 2 - 2 * n2 / 3 + 5 * n3 / 16 + 41 * n4 / 180, 13 * n2 / 48 - 3 * n3 / 5 + 557 * n4 / 1440, 61 * n3 / 240 - 103 * n4 / 140, 49561 * n4 / 161280],
+    be: [n / 2 - 2 * n2 / 3 + 37 * n3 / 96 - n4 / 360, n2 / 48 + n3 / 15 - 437 * n4 / 1440, 17 * n3 / 480 - 37 * n4 / 840, 4397 * n4 / 161280],
+    de: [2 * n - 2 * n2 / 3 - 2 * n3 + 116 * n4 / 45, 7 * n2 / 3 - 8 * n3 / 5 - 227 * n4 / 45, 56 * n3 / 15 - 136 * n4 / 35, 4279 * n4 / 630]
+  };
+})();
+const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+function dark(c, f = 0.62) { const m = /^#?([0-9a-f]{6})$/i.exec(c || ''); if (!m) return '#222'; const n = parseInt(m[1], 16); return '#' + [16, 8, 0].map(sh => Math.round(((n >> sh) & 255) * f).toString(16).padStart(2, '0')).join(''); }
+function llToGtm(lon, lat) {
+  const n = TM.n, phi = rad(lat), lam = rad(lon - GTM.lon0), s = Math.sin(phi);
+  const c = 2 * Math.sqrt(n) / (1 + n);
+  const t = Math.sinh(Math.atanh(s) - c * Math.atanh(c * s));
+  const xi0 = Math.atan2(t, Math.cos(lam)), eta0 = Math.atanh(Math.sin(lam) / Math.sqrt(1 + t * t));
+  let xi = xi0, eta = eta0;
+  for (let j = 1; j <= 4; j++) { xi += TM.al[j - 1] * Math.sin(2 * j * xi0) * Math.cosh(2 * j * eta0); eta += TM.al[j - 1] * Math.cos(2 * j * xi0) * Math.sinh(2 * j * eta0); }
+  return [GTM.fe + GTM.k0 * TM.A * eta, GTM.fn + GTM.k0 * TM.A * xi];
+}
+function gtmToLl(e, nn) {
+  const xi = (nn - GTM.fn) / (GTM.k0 * TM.A), eta = (e - GTM.fe) / (GTM.k0 * TM.A);
+  let xi0 = xi, eta0 = eta;
+  for (let j = 1; j <= 4; j++) { xi0 -= TM.be[j - 1] * Math.sin(2 * j * xi) * Math.cosh(2 * j * eta); eta0 -= TM.be[j - 1] * Math.cos(2 * j * xi) * Math.sinh(2 * j * eta); }
+  const chi = Math.asin(Math.sin(xi0) / Math.cosh(eta0));
+  let phi = chi; for (let j = 1; j <= 4; j++) phi += TM.de[j - 1] * Math.sin(2 * j * chi);
+  const lam = Math.atan2(Math.sinh(eta0), Math.cos(xi0));
+  return [GTM.lon0 + deg(lam), deg(phi)];
+}
+
+// ---------- geometría ----------
+const sArea = pts => { let s = 0; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; s += a.e * b.n - b.e * a.n; } return s / 2; };
+const perim = pts => { let s = 0; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; s += Math.hypot(b.e - a.e, b.n - a.n); } return pts.length > 1 ? s : 0; };
+function centroid(pts) {
+  const a = sArea(pts); if (Math.abs(a) < 1e-9) return { e: pts.reduce((s, p) => s + p.e, 0) / (pts.length || 1), n: pts.reduce((s, p) => s + p.n, 0) / (pts.length || 1) };
+  let cx = 0, cy = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length], k = p.e * q.n - q.e * p.n; cx += (p.e + q.e) * k; cy += (p.n + q.n) * k; }
+  return { e: cx / (6 * a), n: cy / (6 * a) };
+}
+const natKey = n => { const m = /^(\D*)(\d+)(.*)$/.exec(String(n)); return m ? [m[1], +m[2], m[3]] : [String(n), -1, '']; };
+const natCmp = (a, b) => { const x = natKey(a.nombre), y = natKey(b.nombre); return x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] - y[1] || (x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : 0); };
+const dedupeRing = r => { const o = []; for (const id of r) if (o[o.length - 1] !== id) o.push(id); if (o.length > 1 && o[0] === o[o.length - 1]) o.pop(); return o; };
+
+// ---------- modelo ----------
+function emptyProject() {
+  return { formato: 'modeler-my-arq', version: 1, nombre: 'Proyecto nuevo', crs: { tipo: 'GTM', datum: 'WGS84' }, puntos: [], lotes: [], nextId: 1,
+    hoja: { titulo: 'PLANO', subtitulo: '', lugar: '', papel: 'tabloide', escala: 'auto', tablas: true, distancias: false, rejilla: true,
+      nota: 'Plano de referencia: no sustituye un levantamiento topográfico firmado.' } };
+}
+function normalize(o) {
+  const b = emptyProject(); const S = Object.assign(b, o || {});
+  S.hoja = Object.assign(b.hoja, (o && o.hoja) || {});
+  S.puntos = (S.puntos || []).map(p => ({ id: +p.id, nombre: String(p.nombre), e: +p.e, n: +p.n, origen: p.origen || '', antes: p.antes || '', nota: p.nota || '', lab: p.lab == null || p.lab === '' ? null : +p.lab }));
+  S.lotes = (S.lotes || []).map((l, i) => ({ id: String(l.id != null ? l.id : 'L' + (i + 1)), nombre: l.nombre || 'Lote ' + (i + 1), color: l.color || '#1b57e4', hatch: !!l.hatch, pts: (l.pts || []).map(Number), lx: l.lx == null ? null : +l.lx, ly: l.ly == null ? null : +l.ly, lrot: +l.lrot || 0 }));
+  S.nextId = Math.max(S.nextId || 1, ...S.puntos.map(p => p.id + 1), 1);
+  return S;
+}
+let S = emptyProject();
+const ptMap = () => new Map(S.puntos.map(p => [p.id, p]));
+const getP = id => S.puntos.find(p => p.id === id);
+const ringPts = l => { const m = ptMap(); return l.pts.map(i => m.get(i)).filter(Boolean); };
+const lotArea = l => Math.abs(sArea(ringPts(l)));
+function usedIds() { const s = new Set(); S.lotes.forEach(l => l.pts.forEach(i => s.add(i))); return s; }
+function nextName(prefix = 'P') {
+  let mx = 0; S.puntos.forEach(p => { const m = /^P(\d+)$/.exec(p.nombre); if (m) mx = Math.max(mx, +m[1]); });
+  return prefix + (mx + 1);
+}
+function uniqueName(base) { const names = new Set(S.puntos.map(p => p.nombre)); if (!names.has(base)) return base; let i = 2; while (names.has(base + '_' + i)) i++; return base + '_' + i; }
+function addPoint(e, n, nombre, extra) { const p = Object.assign({ id: S.nextId++, nombre: nombre || nextName(), e: r2(e), n: r2(n), origen: '', antes: '', nota: '', lab: null }, extra || {}); S.puntos.push(p); return p; }
+function mergePoints(keepId, dropId) {
+  if (keepId === dropId) return;
+  S.lotes.forEach(l => { l.pts = dedupeRing(l.pts.map(i => i === dropId ? keepId : i)); });
+  S.puntos = S.puntos.filter(p => p.id !== dropId);
+}
+function deletePoint(id) { S.lotes.forEach(l => { l.pts = l.pts.filter(i => i !== id); }); S.puntos = S.puntos.filter(p => p.id !== id); }
+
+// aristas compartidas / perímetro exterior
+function boundaryCycle(startId, cw) {
+  const key = (a, b) => a < b ? a + '-' + b : b + '-' + a, cnt = new Map(), adj = new Map();
+  for (const l of S.lotes) { const r = l.pts; for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; if (a === b) continue; cnt.set(key(a, b), (cnt.get(key(a, b)) || 0) + 1); } }
+  for (const l of S.lotes) { const r = l.pts; for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; if (a === b || cnt.get(key(a, b)) !== 1) continue; if (!adj.has(a)) adj.set(a, []); if (!adj.has(b)) adj.set(b, []); adj.get(a).push(b); adj.get(b).push(a); } }
+  if (!adj.size) return [];
+  const start = startId != null && adj.has(startId) ? startId : Math.min(...adj.keys());
+  const cyc = [start]; let prev = null, cur = start;
+  for (let g = 0; g < 100000; g++) {
+    const nb = adj.get(cur).filter(x => x !== prev);
+    const nxt = prev === null ? adj.get(cur)[0] : nb[0];
+    if (nxt == null || nxt === start) break;
+    if (cyc.includes(nxt)) break;
+    cyc.push(nxt); prev = cur; cur = nxt;
+  }
+  const m = ptMap(), sa = sArea(cyc.map(i => m.get(i)));
+  if ((cw && sa > 0) || (!cw && sa < 0)) return [cyc[0], ...cyc.slice(1).reverse()];
+  return cyc;
+}
+function uniqueEdges() {
+  const key = (a, b) => a < b ? a + '-' + b : b + '-' + a, seen = new Set(), out = [], m = ptMap();
+  for (const l of S.lotes) for (let i = 0; i < l.pts.length; i++) {
+    const a = l.pts[i], b = l.pts[(i + 1) % l.pts.length]; if (a === b || seen.has(key(a, b))) continue; seen.add(key(a, b));
+    const pa = m.get(a), pb = m.get(b); if (pa && pb) out.push({ a: pa, b: pb, d: Math.hypot(pb.e - pa.e, pb.n - pa.n) });
+  }
+  return out;
+}
+function computeRenumber(startId, cw, prefix = 'P') {
+  const cyc = boundaryCycle(startId, cw), used = usedIds(), m = ptMap(), inC = new Set(cyc);
+  let rest = [...used].filter(i => !inC.has(i) && m.has(i));
+  if (cyc.length) {
+    const cx = cyc.reduce((s, i) => s + m.get(i).e, 0) / cyc.length, cy = cyc.reduce((s, i) => s + m.get(i).n, 0) / cyc.length;
+    const a0 = Math.atan2(m.get(cyc[0]).n - cy, m.get(cyc[0]).e - cx);
+    const key = i => { let d = Math.atan2(m.get(i).n - cy, m.get(i).e - cx) - a0; if (cw) d = -d; return ((d % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); };
+    rest.sort((a, b) => key(a) - key(b));
+  }
+  const unused = S.puntos.filter(p => !used.has(p.id)).sort(natCmp).map(p => p.id);
+  const order = [...cyc, ...rest, ...unused];
+  return order.map((id, i) => ({ id, viejo: m.get(id).nombre, nuevo: prefix + (i + 1), exterior: inC.has(id) }));
+}
+
+// ---------- historial / guardado ----------
+const hist = { u: [], r: [] };
+function snapshot() { hist.u.push(JSON.stringify(S)); if (hist.u.length > 200) hist.u.shift(); hist.r.length = 0; updUndo(); }
+function undo() { if (!hist.u.length) return; hist.r.push(JSON.stringify(S)); S = normalize(JSON.parse(hist.u.pop())); afterChange(true); }
+function redo() { if (!hist.r.length) return; hist.u.push(JSON.stringify(S)); S = normalize(JSON.parse(hist.r.pop())); afterChange(true); }
+function updUndo() { const u = $('#bUndo'), r = $('#bRedo'); if (u) { u.disabled = !hist.u.length; r.disabled = !hist.r.length; } }
+const LS = 'modeler-my-arq:proyecto:v1';
+function persist() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) { /* sin almacenamiento */ } }
+function afterChange(keepSel) {
+  if (!keepSel) { /* nada */ }
+  if (sel.pt != null && !getP(sel.pt)) sel.pt = null;
+  if (sel.lot != null && !S.lotes.find(l => l.id === sel.lot)) sel.lot = null;
+  persist(); renderAll(); updUndo();
+}
+function mutate(fn) { snapshot(); fn(); afterChange(); }
+
+// ---------- estado de la interfaz ----------
+const sel = { pt: null, lot: null };
+let mode = 'mover', pendingMerge = null, pendingMeasure = null, activeTab = 'puntos';
+let toastT = null;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+
+// ---------- vista del plano ----------
+const V = { cx: 0, cy: 0, k: 1, w: 800, h: 600 };
+const w2s = (e, n) => [(e - V.cx) * V.k + V.w / 2, -(n - V.cy) * V.k + V.h / 2];
+const s2w = (x, y) => [(x - V.w / 2) / V.k + V.cx, -(y - V.h / 2) / V.k + V.cy];
+function bbox(list) {
+  const ps = list || S.puntos; if (!ps.length) return null;
+  return { e0: Math.min(...ps.map(p => p.e)), e1: Math.max(...ps.map(p => p.e)), n0: Math.min(...ps.map(p => p.n)), n1: Math.max(...ps.map(p => p.n)) };
+}
+function fitView() {
+  const r = $('#view').getBoundingClientRect(); V.w = r.width || 800; V.h = r.height || 600;
+  const b = bbox(); if (!b) { V.cx = 0; V.cy = 0; V.k = 4; return; }
+  const w = Math.max(b.e1 - b.e0, 5), h = Math.max(b.n1 - b.n0, 5);
+  V.k = Math.min((V.w - 90) / w, (V.h - 110) / h); V.cx = (b.e0 + b.e1) / 2; V.cy = (b.n0 + b.n1) / 2;
+}
+function niceStep(minM) { for (const m of [.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000]) if (m >= minM) return m; return 10000; }
+function drawCanvas() {
+  const svg = $('#view'), out = [];
+  const r = svg.getBoundingClientRect(); V.w = r.width || V.w; V.h = r.height || V.h;
+  // rejilla
+  if (S.hoja.rejilla) {
+    const step = niceStep(70 / V.k), [e0, n1] = s2w(0, 0), [e1, n0] = s2w(V.w, V.h);
+    for (let e = Math.ceil(e0 / step) * step; e <= e1; e += step) { const x = w2s(e, 0)[0]; out.push(`<line x1="${x}" y1="0" x2="${x}" y2="${V.h}" stroke="#e6e9ee"/><text x="${x + 3}" y="${V.h - 22}" font-size="10" fill="#98a2b3">${Math.round(e)}</text>`); }
+    for (let n = Math.ceil(n0 / step) * step; n <= n1; n += step) { const y = w2s(0, n)[1]; out.push(`<line x1="0" y1="${y}" x2="${V.w}" y2="${y}" stroke="#e6e9ee"/><text x="3" y="${y - 3}" font-size="10" fill="#98a2b3">${Math.round(n)}</text>`); }
+  }
+  const m = ptMap();
+  for (const l of S.lotes) {
+    const ps = l.pts.map(i => m.get(i)).filter(Boolean); if (ps.length < 2) continue;
+    const d = ps.map(p => w2s(p.e, p.n).map(v => v.toFixed(1)).join(',')).join(' ');
+    out.push(`<polygon data-lot="${esc(l.id)}" points="${d}" fill="${l.color}" fill-opacity="${l.hatch ? .34 : .2}" stroke="${l.color}" stroke-width="${sel.lot === l.id ? 3.2 : 1.8}" stroke-linejoin="round"/>`);
+  }
+  const cyc = boundaryCycle(null, true);
+  if (cyc.length > 2) out.push(`<polygon points="${cyc.map(i => w2s(m.get(i).e, m.get(i).n).map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#111" stroke-width="2" pointer-events="none"/>`);
+  if (S.hoja.distancias) for (const ed of uniqueEdges()) {
+    const [x1, y1] = w2s(ed.a.e, ed.a.n), [x2, y2] = w2s(ed.b.e, ed.b.n); let ang = deg(Math.atan2(y2 - y1, x2 - x1)); if (ang > 90 || ang < -90) ang += 180;
+    out.push(`<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 3}" font-size="10" text-anchor="middle" fill="#344054" transform="rotate(${ang.toFixed(1)} ${(x1 + x2) / 2} ${(y1 + y2) / 2})" pointer-events="none">${ed.d.toFixed(2)}</text>`);
+  }
+  for (const l of S.lotes) {
+    const ps = ringPts(l); if (ps.length < 3) continue;
+    const c = l.lx != null && l.ly != null ? { e: l.lx, n: l.ly } : centroid(ps), [x, y] = w2s(c.e, c.n);
+    out.push(`<text x="${x}" y="${y}" text-anchor="middle" font-size="12" font-weight="700" fill="${dark(l.color)}" paint-order="stroke" stroke="#fff" stroke-width="3" transform="rotate(${-(l.lrot || 0)} ${x} ${y})" pointer-events="none"><tspan x="${x}" dy="-2">${esc(l.nombre)}</tspan><tspan x="${x}" dy="14" font-weight="400">${fmt(lotArea(l))} m²</tspan></text>`);
+  }
+  if (mode === 'lote' && sel.lot) {
+    const l = S.lotes.find(q => q.id === sel.lot), ps = l ? ringPts(l) : [];
+    if (ps.length > 1) out.push(`<polyline points="${ps.map(p => w2s(p.e, p.n).join(',')).join(' ')}" fill="none" stroke="${l.color}" stroke-width="3" stroke-dasharray="6 4" pointer-events="none"/>`);
+  }
+  for (const p of S.puntos) {
+    const [x, y] = w2s(p.e, p.n), isSel = sel.pt === p.id, pm = pendingMerge === p.id || pendingMeasure === p.id;
+    out.push(`<g data-pt="${p.id}" style="cursor:${mode === 'mover' ? 'grab' : 'pointer'}"><circle cx="${x}" cy="${y}" r="16" fill="transparent"/><circle cx="${x}" cy="${y}" r="${isSel || pm ? 6 : 4}" fill="${pm ? '#f79009' : isSel ? '#1b57e4' : '#111'}" stroke="#fff" stroke-width="1.5"/><text x="${x + 7}" y="${y - 7}" font-size="12" font-weight="700" fill="${isSel ? '#1b57e4' : '#111'}" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(p.nombre)}</text></g>`);
+  }
+  svg.innerHTML = out.join('');
+}
+
+// ---------- interacción en el plano ----------
+const view = $('#view'), ptrs = new Map();
+let drag = null, pinch = null;
+function localXY(ev) { const r = view.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
+function setMode(m) {
+  mode = m; pendingMerge = null; pendingMeasure = null;
+  $$('#tools [data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  const h = { mover: 'Arrastra un punto para moverlo; arrastra el fondo para desplazar; rueda o pellizco para acercar.', agregar: 'Toca el plano para agregar un punto.', lote: 'Toca los puntos en orden. Toca el primero de nuevo (o Esc) para cerrar el lote.', fusionar: 'Toca el punto que se conserva y luego el que se fusiona en él.', medir: 'Toca dos puntos para medir distancia y azimut.' };
+  $('#status').textContent = h[m]; view.style.cursor = m === 'agregar' ? 'crosshair' : 'default'; drawCanvas();
+}
+view.addEventListener('pointerdown', ev => {
+  view.setPointerCapture(ev.pointerId); ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) }; drag = null; return; }
+  const [x, y] = localXY(ev), g = ev.target.closest && ev.target.closest('[data-pt]'), pl = ev.target.closest && ev.target.closest('[data-lot]');
+  drag = { sx: x, sy: y, cx: V.cx, cy: V.cy, moved: false, pt: g ? +g.dataset.pt : null, lot: pl ? pl.dataset.lot : null, moving: false };
+  if (mode === 'mover' && drag.pt != null) { snapshot(); selectPoint(drag.pt); drag.moving = true; }
+});
+view.addEventListener('pointermove', ev => {
+  const [x, y] = localXY(ev), [e, n] = s2w(x, y); $('#status').dataset.xy = `E ${e.toFixed(2)}  N ${n.toFixed(2)}`;
+  if (!ptrs.has(ev.pointerId)) { if (!drag) $('#status').textContent = `E ${e.toFixed(2)}   N ${n.toFixed(2)}   ·   modo: ${mode}`; return; }
+  ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (ptrs.size === 2 && pinch) {
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch.d > 0) { V.k = Math.min(Math.max(V.k * d / pinch.d, 0.05), 400); drawCanvas(); } pinch.d = d; return;
+  }
+  if (!drag) return;
+  if (Math.hypot(x - drag.sx, y - drag.sy) > 4) drag.moved = true;
+  if (!drag.moved) return;
+  if (drag.moving) {
+    const p = getP(drag.pt); if (p) { p.e = r2(e); p.n = r2(n); drawCanvas(); syncRow(p); }
+  } else if (mode === 'mover' || drag.pt == null) { V.cx = drag.cx - (x - drag.sx) / V.k; V.cy = drag.cy + (y - drag.sy) / V.k; drawCanvas(); }
+});
+function endPtr(ev) {
+  ptrs.delete(ev.pointerId); if (ptrs.size < 2) pinch = null;
+  if (!drag) return; const d = drag; drag = null;
+  if (d.moving && d.moved) { persist(); renderAll(); return; }
+  if (d.moved) return;
+  const [x, y] = localXY(ev), [e, n] = s2w(x, y);
+  if (mode === 'agregar') { mutate(() => { const p = addPoint(e, n); sel.pt = p.id; }); toast(`Punto ${getP(sel.pt).nombre} agregado`); }
+  else if (mode === 'lote' && d.pt != null) clickLotPoint(d.pt);
+  else if (mode === 'fusionar' && d.pt != null) clickMerge(d.pt);
+  else if (mode === 'medir' && d.pt != null) clickMeasure(d.pt);
+  else if (mode === 'mover') { if (d.pt != null) selectPoint(d.pt); else if (d.lot) { sel.lot = d.lot; sel.pt = null; renderAll(); setTab('lotes'); } else { sel.pt = null; sel.lot = null; renderAll(); } }
+}
+view.addEventListener('pointerup', endPtr); view.addEventListener('pointercancel', endPtr);
+view.addEventListener('wheel', ev => {
+  ev.preventDefault(); const [x, y] = localXY(ev), [e, n] = s2w(x, y);
+  V.k = Math.min(Math.max(V.k * Math.pow(1.0018, -ev.deltaY), 0.05), 400);
+  V.cx = e - (x - V.w / 2) / V.k; V.cy = n + (y - V.h / 2) / V.k; drawCanvas();
+}, { passive: false });
+view.addEventListener('dblclick', ev => { if (mode === 'lote') finishLot(); });
+function clickLotPoint(id) {
+  let l = S.lotes.find(q => q.id === sel.lot);
+  if (!l) { snapshot(); l = newLot(); S.lotes.push(l); sel.lot = l.id; }
+  else if (l.pts.length >= 3 && l.pts[0] === id) { finishLot(); return; }
+  else snapshot();
+  if (l.pts[l.pts.length - 1] !== id) l.pts.push(id);
+  afterChange();
+}
+function finishLot() { setMode('mover'); toast('Lote cerrado'); renderAll(); }
+function clickMerge(id) {
+  if (pendingMerge == null) { pendingMerge = id; toast(`Se conserva ${getP(id).nombre}. Toca el punto a fusionar.`); drawCanvas(); return; }
+  if (pendingMerge === id) { pendingMerge = null; drawCanvas(); return; }
+  const keep = getP(pendingMerge), drop = getP(id); pendingMerge = null;
+  mutate(() => { mergePoints(keep.id, drop.id); sel.pt = keep.id; });
+  toast(`${drop.nombre} fusionado en ${keep.nombre}`);
+}
+function clickMeasure(id) {
+  if (pendingMeasure == null) { pendingMeasure = id; drawCanvas(); return; }
+  const a = getP(pendingMeasure), b = getP(id); pendingMeasure = null; drawCanvas();
+  if (!a || !b || a === b) return;
+  const dd = Math.hypot(b.e - a.e, b.n - a.n); let az = deg(Math.atan2(b.e - a.e, b.n - a.n)); if (az < 0) az += 360;
+  toast(`${a.nombre} → ${b.nombre}: ${dd.toFixed(2)} m · azimut ${az.toFixed(2)}°`);
+}
+function selectPoint(id) {
+  sel.pt = id; drawCanvas();
+  $$('#tab-puntos tr[data-id]').forEach(r => r.classList.toggle('sel', +r.dataset.id === id));
+  renderPtDetail(); const row = $(`#tab-puntos tr[data-id="${id}"]`); if (row && activeTab === 'puntos') row.scrollIntoView({ block: 'nearest' });
+}
+function syncRow(p) { const r = $(`#tab-puntos tr[data-id="${p.id}"]`); if (!r) return; const i = $$('input', r); if (i[1]) i[1].value = p.e.toFixed(2); if (i[2]) i[2].value = p.n.toFixed(2); }
+
+// ---------- paneles ----------
+function setTab(t) { activeTab = t; $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $$('.tab').forEach(s => s.classList.toggle('on', s.id === 'tab-' + t)); }
+function renderPoints() {
+  const el = $('#tab-puntos'), rows = [...S.puntos].sort(natCmp).map(p => `<tr data-id="${p.id}" class="${sel.pt === p.id ? 'sel' : ''}"><td style="width:27%"><input class="nm" data-f="nombre" value="${esc(p.nombre)}"></td><td><input class="n" data-f="e" inputmode="decimal" value="${p.e.toFixed(2)}"></td><td><input class="n" data-f="n" inputmode="decimal" value="${p.n.toFixed(2)}"></td><td style="width:34px"><button class="x" data-act="delpt" title="Eliminar punto">✕</button></td></tr>`).join('');
+  el.innerHTML = `<h3>Puntos medidos (${S.puntos.length})</h3>
+  <div class="hint">Edita el nombre, el Este o el Norte (metros, GTM). También puedes arrastrar los puntos en el plano.</div>
+  <table><thead><tr><th>Nombre</th><th>Este</th><th>Norte</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  <div class="row"><button data-act="addpt">＋ Agregar punto</button></div>
+  <div id="ptdetail"></div>`;
+  renderPtDetail();
+}
+function renderPtDetail() {
+  const el = $('#ptdetail'); if (!el) return; const p = getP(sel.pt);
+  if (!p) { el.innerHTML = ''; return; }
+  const ll = gtmToLl(p.e, p.n), inLots = S.lotes.filter(l => l.pts.includes(p.id)).map(l => l.nombre).join(', ') || '—';
+  el.innerHTML = `<div class="box"><b>${esc(p.nombre)}</b> <span class="hint">· Lat ${ll[1].toFixed(7)} · Lon ${ll[0].toFixed(7)}</span>
+  <div class="hint">Lotes: ${esc(inLots)}</div>
+  <div class="row"><label style="width:62px">Origen</label><input data-d="origen" value="${esc(p.origen)}" style="flex:1"></div>
+  <div class="row"><label style="width:62px">Nota</label><input data-d="nota" value="${esc(p.nota)}" style="flex:1"></div>
+  <div class="row"><label style="width:62px">Etiqueta °</label><input data-d="lab" type="number" step="5" placeholder="auto" value="${p.lab == null ? '' : p.lab}" style="width:90px"><span class="hint">0 = este, 90 = norte</span></div>
+  <div class="row"><button data-act="mergeinto">Fusionar con otro punto…</button></div></div>`;
+}
+function newLot() { let i = 1; while (S.lotes.some(l => l.id === 'L' + i)) i++; const cols = ['#c0392b', '#2e6da4', '#1e8449', '#b9770e', '#8e44ad', '#117a8b']; return { id: 'L' + i, nombre: 'Lote ' + i, color: cols[(i - 1) % cols.length], hatch: false, pts: [], lx: null, ly: null, lrot: 0 }; }
+function lotStats(l) {
+  const ps = ringPts(l), a = Math.abs(sArea(ps)), pr = perim(ps);
+  return `${fmt(a)} m² · ${fmt(a / VARA2, 0)} varas² · ${(a / MANZANA).toFixed(3)} mz · perím. ${fmt(pr)} m`;
+}
+function renderLots() {
+  const m = ptMap(), el = $('#tab-lotes');
+  const cards = S.lotes.map(l => {
+    const isSel = sel.lot === l.id;
+    const chips = l.pts.map((id, i) => `<span class="chip">${esc(m.get(id) ? m.get(id).nombre : '?')}<button data-act="lup" data-i="${i}" title="Subir">‹</button><button data-act="ldown" data-i="${i}" title="Bajar">›</button><button data-act="lrem" data-i="${i}" title="Quitar">✕</button></span>`).join('');
+    const opts = [...S.puntos].sort(natCmp).map(p => `<option value="${p.id}">${esc(p.nombre)}</option>`).join('');
+    return `<div class="lot ${isSel ? 'sel' : ''}" data-lot="${esc(l.id)}">
+      <div class="row" style="margin:0"><input type="color" data-lf="color" value="${l.color}"><input data-lf="nombre" value="${esc(l.nombre)}" style="flex:1"></div>
+      <div class="stats">${lotStats(l)}</div>
+      ${isSel ? `<div class="hint">Orden de los puntos (sentido del trazo):</div><div class="chips">${chips || '<span class="hint">sin puntos</span>'}</div>
+      <div class="row"><select id="addToLot" style="flex:1"><option value="">Agregar punto…</option>${opts}</select><button data-act="ladd">Añadir</button></div>
+      <div class="row"><button data-act="ldraw">⬠ Trazar en plano</button><button data-act="lrev">⇄ Invertir</button><label><input type="checkbox" data-lf="hatch" ${l.hatch ? 'checked' : ''}> Rayado</label></div>
+      <div class="row"><label>Etiqueta E</label><input class="n" data-lf="lx" inputmode="decimal" placeholder="auto" value="${l.lx == null ? '' : l.lx}" style="width:92px"><label>N</label><input class="n" data-lf="ly" inputmode="decimal" placeholder="auto" value="${l.ly == null ? '' : l.ly}" style="width:92px"><label>Giro°</label><input class="n" data-lf="lrot" inputmode="decimal" value="${l.lrot || 0}" style="width:62px"></div>
+      <div class="row"><button data-act="lcen">Centrar etiqueta</button><button class="danger" data-act="ldel">Eliminar lote</button></div>` : ''}
+    </div>`;
+  }).join('');
+  const cyc = boundaryCycle(null, true), tot = cyc.length > 2 ? Math.abs(sArea(cyc.map(i => m.get(i)))) : 0;
+  el.innerHTML = `<h3>Lotes (${S.lotes.length})</h3><div class="hint">Cada lote es una lista ordenada de puntos. Los lotes vecinos comparten puntos, así todo encaja en un solo plano.</div>${cards}
+  <div class="row"><button data-act="lnew">＋ Nuevo lote</button></div>
+  ${tot ? `<div class="box"><b>Polígono exterior</b><div class="stats">${fmt(tot)} m² · ${fmt(tot / VARA2, 0)} varas² · ${(tot / MANZANA).toFixed(3)} mz · perím. ${fmt(perim(cyc.map(i => m.get(i))))} m</div></div>` : ''}`;
+}
+let renumPreview = null;
+function renderRenum() {
+  const el = $('#tab-renum'), starts = [...S.puntos].sort(natCmp).map(p => `<option value="${p.id}" ${renumPreview && renumPreview.start === p.id ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('');
+  const dirv = renumPreview ? renumPreview.cw : true;
+  const pv = renumPreview ? `<table><thead><tr><th>Antes</th><th>Ahora</th><th></th></tr></thead><tbody>${renumPreview.rows.map(r => `<tr><td>${esc(r.viejo)}</td><td><b>${esc(r.nuevo)}</b></td><td class="hint">${r.exterior ? 'exterior' : 'interior'}</td></tr>`).join('')}</tbody></table>
+    <div class="row"><button class="pri" data-act="rnapply">Aplicar renumeración</button><button data-act="rncancel">Cancelar</button></div>` : '';
+  el.innerHTML = `<h3>Renumerar puntos</h3>
+  <div class="hint">Numera primero el perímetro exterior, desde el punto de inicio y en el sentido elegido, y después los puntos interiores. Lo normal en planos topográficos es el sentido horario.</div>
+  <div class="row"><label style="width:96px">Punto inicial</label><select id="rnStart" style="flex:1">${starts}</select></div>
+  <div class="row"><label style="width:96px">Sentido</label><select id="rnDir" style="flex:1"><option value="cw" ${dirv ? 'selected' : ''}>Horario (↻)</option><option value="ccw" ${!dirv ? 'selected' : ''}>Antihorario (↺)</option></select></div>
+  <div class="row"><label style="width:96px">Prefijo</label><input id="rnPre" value="${esc(renumPreview ? renumPreview.prefix : 'P')}" style="width:80px"></div>
+  <div class="row"><button data-act="rnprev">Vista previa</button></div>${pv}`;
+}
+function renderHoja() {
+  const h = S.hoja, el = $('#tab-hoja');
+  const esc_ = ['auto', 250, 500, 750, 1000, 1250, 1500, 2000, 2500, 5000].map(v => `<option value="${v}" ${String(h.escala) === String(v) ? 'selected' : ''}>${v === 'auto' ? 'Automática' : '1:' + v}</option>`).join('');
+  const pap = Object.entries(PAPEL).map(([k, v]) => `<option value="${k}" ${h.papel === k ? 'selected' : ''}>${v[2]}</option>`).join('');
+  el.innerHTML = `<h3>Hoja del plano</h3>
+  <div class="row"><label style="width:78px">Proyecto</label><input data-h="__nombre" value="${esc(S.nombre)}" style="flex:1"></div>
+  <div class="row"><label style="width:78px">Título</label><input data-h="titulo" value="${esc(h.titulo)}" style="flex:1"></div>
+  <div class="row"><label style="width:78px">Subtítulo</label><input data-h="subtitulo" value="${esc(h.subtitulo)}" style="flex:1"></div>
+  <div class="row"><label style="width:78px">Lugar</label><input data-h="lugar" value="${esc(h.lugar)}" style="flex:1"></div>
+  <div class="row"><label style="width:78px">Papel</label><select data-h="papel" style="flex:1">${pap}</select></div>
+  <div class="row"><label style="width:78px">Escala</label><select data-h="escala" style="flex:1">${esc_}</select></div>
+  <div class="row"><label><input type="checkbox" data-h="tablas" ${h.tablas ? 'checked' : ''}> Cuadros de coordenadas y lotes</label></div>
+  <div class="row"><label><input type="checkbox" data-h="distancias" ${h.distancias ? 'checked' : ''}> Mostrar distancias en los lados</label></div>
+  <div class="row"><label><input type="checkbox" data-h="rejilla" ${h.rejilla ? 'checked' : ''}> Rejilla de coordenadas</label></div>
+  <div class="row"><label style="width:78px;align-self:flex-start">Notas</label><textarea data-h="nota" rows="4" style="flex:1">${esc(h.nota)}</textarea></div>
+  <div class="row"><button class="pri" data-act="opensheet">Ver plano / Exportar</button></div>
+  <div class="hint">En el PDF (imprimir) elige «Guardar como PDF», tamaño de papel igual al de la hoja y escala 100 %.</div>`;
+}
+function renderAll() { renderPoints(); renderLots(); renderRenum(); renderHoja(); drawCanvas(); updUndo(); }
+
+// ---------- eventos de paneles ----------
+document.addEventListener('click', ev => {
+  const t = ev.target.closest('[data-act]'), tab = ev.target.closest('#tabs [data-tab]'), md = ev.target.closest('#tools [data-mode]');
+  if (tab) { setTab(tab.dataset.tab); return; }
+  if (md) { setMode(md.dataset.mode); return; }
+  const row = ev.target.closest('#tab-puntos tr[data-id]'); if (row && !t) selectPoint(+row.dataset.id);
+  const lotEl = ev.target.closest('.lot'); if (lotEl && !t && !ev.target.closest('input,select,button,textarea') && sel.lot !== lotEl.dataset.lot) { sel.lot = lotEl.dataset.lot; renderLots(); drawCanvas(); }
+  if (!t) return;
+  const a = t.dataset.act, l = S.lotes.find(q => q.id === sel.lot), i = t.dataset.i != null ? +t.dataset.i : null;
+  if (a === 'delpt') { const id = +t.closest('tr').dataset.id, p = getP(id); if (usedIds().has(id) && !confirm(`${p.nombre} pertenece a un lote. ¿Eliminarlo de todas formas?`)) return; mutate(() => deletePoint(id)); }
+  else if (a === 'addpt') { mutate(() => { const p = addPoint(V.cx, V.cy); sel.pt = p.id; }); toast('Punto agregado al centro de la vista; edita sus coordenadas o arrástralo'); }
+  else if (a === 'mergeinto') { if (sel.pt != null) { pendingMerge = sel.pt; setMode('fusionar'); pendingMerge = sel.pt; drawCanvas(); toast(`Se conserva ${getP(sel.pt).nombre}. Toca el punto a fusionar.`); } }
+  else if (a === 'lnew') { mutate(() => { const n = newLot(); S.lotes.push(n); sel.lot = n.id; }); }
+  else if (a === 'ldel' && l) { if (confirm(`¿Eliminar el lote «${l.nombre}»? (los puntos se conservan)`)) mutate(() => { S.lotes = S.lotes.filter(q => q !== l); sel.lot = null; }); }
+  else if (a === 'ldraw' && l) { setMode('lote'); toast('Toca los puntos en orden. Toca el primero para cerrar.'); }
+  else if (a === 'lrev' && l) mutate(() => l.pts.reverse());
+  else if (a === 'lrem' && l) mutate(() => l.pts.splice(i, 1));
+  else if (a === 'lup' && l && i > 0) mutate(() => { [l.pts[i - 1], l.pts[i]] = [l.pts[i], l.pts[i - 1]]; });
+  else if (a === 'ldown' && l && i < l.pts.length - 1) mutate(() => { [l.pts[i + 1], l.pts[i]] = [l.pts[i], l.pts[i + 1]]; });
+  else if (a === 'ladd' && l) { const v = +$('#addToLot').value; if (v) mutate(() => l.pts.push(v)); }
+  else if (a === 'lcen' && l) mutate(() => { const c = centroid(ringPts(l)); l.lx = r2(c.e); l.ly = r2(c.n); });
+  else if (a === 'rnprev') { const start = +$('#rnStart').value, cw = $('#rnDir').value === 'cw', prefix = $('#rnPre').value || 'P'; renumPreview = { start, cw, prefix, rows: computeRenumber(start, cw, prefix) }; renderRenum(); }
+  else if (a === 'rncancel') { renumPreview = null; renderRenum(); }
+  else if (a === 'rnapply' && renumPreview) { const rows = renumPreview.rows; mutate(() => { const m = ptMap(); rows.forEach(r => { const p = m.get(r.id); if (p.nombre !== r.nuevo) p.antes = p.nombre; p.nombre = r.nuevo; }); }); renumPreview = null; renderRenum(); toast('Puntos renumerados'); }
+  else if (a === 'opensheet') openSheet();
+});
+document.addEventListener('change', ev => {
+  const el = ev.target, tr = el.closest('#tab-puntos tr[data-id]');
+  if (tr && el.dataset.f) {
+    const p = getP(+tr.dataset.id), f = el.dataset.f;
+    if (f === 'nombre') { const v = el.value.trim(); if (!v) { el.value = p.nombre; return; } mutate(() => { p.nombre = v; }); }
+    else { const v = num(el.value); if (isNaN(v)) { el.value = p[f].toFixed(2); return; } mutate(() => { p[f] = r2(v); }); }
+    return;
+  }
+  if (el.dataset.d && sel.pt != null) { const p = getP(sel.pt), f = el.dataset.d; snapshot(); if (f === 'lab') p.lab = el.value === '' ? null : num(el.value); else p[f] = el.value; persist(); drawCanvas(); return; }
+  const lotEl = el.closest('.lot');
+  if (lotEl && el.dataset.lf) {
+    const l = S.lotes.find(q => q.id === lotEl.dataset.lot), f = el.dataset.lf; snapshot();
+    if (f === 'color' || f === 'nombre') l[f] = el.value; else if (f === 'hatch') l.hatch = el.checked;
+    else { const v = el.value === '' ? null : num(el.value); l[f] = f === 'lrot' ? (v || 0) : v; }
+    afterChange(); return;
+  }
+  if (el.dataset.h) {
+    const f = el.dataset.h; snapshot();
+    if (f === '__nombre') S.nombre = el.value; else if (['tablas', 'distancias', 'rejilla'].includes(f)) S.hoja[f] = el.checked; else if (f === 'escala') S.hoja.escala = el.value === 'auto' ? 'auto' : +el.value; else S.hoja[f] = el.value;
+    persist(); drawCanvas(); return;
+  }
+});
+document.addEventListener('keydown', ev => {
+  const tag = (ev.target.tagName || '').toLowerCase(); const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z' && !typing) { ev.preventDefault(); ev.shiftKey ? redo() : undo(); }
+  else if (ev.key === 'Escape') { if ($('#sheetModal').classList.contains('on')) closeSheet(); else if (mode === 'lote') finishLot(); else setMode('mover'); }
+});
+
+// ---------- importar ----------
+function parseKML(txt) {
+  const doc = new DOMParser().parseFromString(txt, 'application/xml'), pts = [], polys = [];
+  const parseCoords = s => s.trim().split(/\s+/).map(c => c.split(',').map(Number)).filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1]));
+  $$('Placemark', doc).forEach(pm => {
+    const name = ($('name', pm) || {}).textContent || '';
+    const pt = $('Point coordinates', pm), pg = $('Polygon outerBoundaryIs coordinates', pm) || $('Polygon coordinates', pm);
+    if (pg) { const c = parseCoords(pg.textContent); if (c.length > 1 && c[0][0] === c[c.length - 1][0] && c[0][1] === c[c.length - 1][1]) c.pop(); polys.push({ name, coords: c, desc: ($('description', pm) || {}).textContent || '' }); }
+    else if (pt) { const c = parseCoords(pt.textContent)[0]; if (c) pts.push({ name, lon: c[0], lat: c[1], desc: ($('description', pm) || {}).textContent || '' }); }
+  });
+  return { pts, polys };
+}
+function importKML(txt, merge) {
+  const { pts, polys } = parseKML(txt); if (!pts.length && !polys.length) throw new Error('El KML no tiene puntos ni polígonos');
+  if (!merge) S = emptyProject();
+  const ids = [], find = (e, n) => S.puntos.find(p => Math.hypot(p.e - e, p.n - n) < 0.02);
+  const made = [];
+  pts.forEach(q => { const [e, n] = llToGtm(q.lon, q.lat), ex = made.find(p => Math.hypot(p.e - r2(e), p.n - r2(n)) < 0.02); if (!ex) made.push(addPoint(e, n, uniqueName(q.name || nextName()), { origen: 'KML', nota: q.desc })); });
+  polys.forEach(pg => {
+    const ring = pg.coords.map(c => { const [e, n] = llToGtm(c[0], c[1]); let p = made.find(x => Math.hypot(x.e - r2(e), x.n - r2(n)) < 0.02) || find(r2(e), r2(n)); if (!p) { p = addPoint(e, n, uniqueName(nextName()), { origen: 'KML' }); made.push(p); } return p.id; });
+    const l = newLot(); l.nombre = pg.name || l.nombre; l.pts = dedupeRing(ring); S.lotes.push(l); ids.push(l.id);
+  });
+  if (!merge && polys[0] && polys[0].name) S.nombre = polys[0].name;
+}
+function importCSV(txt, merge) {
+  const rows = txt.split(/\r?\n/).map(r => r.trim()).filter(Boolean).map(r => r.split(/[;\t,]/).map(c => c.trim().replace(/^"|"$/g, '')));
+  const data = rows.filter(r => r.length >= 3 && !isNaN(num(r[1])) && !isNaN(num(r[2]))); if (!data.length) throw new Error('No encontré filas «nombre, este, norte»');
+  if (!merge) S = emptyProject();
+  data.forEach(r => { let a = num(r[1]), b = num(r[2]); if (Math.abs(a) <= 180 && Math.abs(b) <= 90) { [a, b] = llToGtm(a, b); } addPoint(a, b, uniqueName(r[0] || nextName()), { origen: 'CSV', nota: r[4] || '' }); });
+}
+function openText(name, txt) {
+  const low = name.toLowerCase();
+  const merge = S.puntos.length > 0 && !low.endsWith('.json') ? confirm('¿Agregar al proyecto actual?\nAceptar = agregar · Cancelar = reemplazar el proyecto') : false;
+  snapshot();
+  try {
+    if (low.endsWith('.json') || txt.trim().startsWith('{')) { S = normalize(JSON.parse(txt)); }
+    else if (low.endsWith('.kml') || txt.includes('<kml')) importKML(txt, merge);
+    else importCSV(txt, merge);
+  } catch (e) { hist.u.pop(); toast('No se pudo abrir: ' + e.message); return; }
+  sel.pt = null; sel.lot = null; renumPreview = null; persist(); renderAll(); fitView(); setMode('mover'); toast(`Abierto: ${S.puntos.length} puntos, ${S.lotes.length} lotes`);
+}
+
+// ---------- exportar ----------
+function download(name, mime, data) {
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+const fname = ext => (S.nombre || 'plano').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w\-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) + '.' + ext;
+const projectJSON = () => JSON.stringify(S, null, 1);
+function toCSV() {
+  const q = s => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+  return '﻿' + ['nombre,este,norte,origen,nota', ...[...S.puntos].sort(natCmp).map(p => [q(p.nombre), p.e.toFixed(2), p.n.toFixed(2), q(p.origen), q(p.nota)].join(','))].join('\r\n') + '\r\n';
+}
+function toKML() {
+  const m = ptMap(), ll = p => { const c = gtmToLl(p.e, p.n); return `${c[0].toFixed(8)},${c[1].toFixed(8)},0`; };
+  const pol = S.lotes.map(l => { const ps = ringPts(l); if (ps.length < 3) return ''; const c = ps.concat([ps[0]]).map(ll).join(' '); const col = l.color.replace('#', ''), kc = 'ff' + col.slice(4, 6) + col.slice(2, 4) + col.slice(0, 2);
+    return `<Placemark><name>${esc(l.nombre)}</name><description>${esc(lotStats(l))}</description><Style><LineStyle><color>${kc}</color><width>3</width></LineStyle><PolyStyle><color>55${kc.slice(2)}</color></PolyStyle></Style><Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>${c}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`; }).join('\n');
+  const pts = [...S.puntos].sort(natCmp).map(p => `<Placemark><name>${esc(p.nombre)}</name><description>${esc([p.origen, p.nota].filter(Boolean).join(' · '))}</description><Point><coordinates>${ll(p)}</coordinates></Point></Placemark>`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${esc(S.nombre)}</name>\n${pol}\n${pts}\n</Document></kml>\n`;
+}
+function toDXF() {
+  const clean = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '?');
+  const lay = s => clean(s).toUpperCase().replace(/[^A-Z0-9_]/g, '_').slice(0, 28) || 'LOTE';
+  const out = [], g = (c, v) => out.push(String(c), String(v));
+  const aci = [1, 5, 3, 4, 6, 2, 30, 8], layers = [['PUNTOS', 7], ['ETIQUETAS', 7], ['PERIMETRO', 7], ...S.lotes.map((l, i) => ['LOTE_' + lay(l.nombre), aci[i % aci.length]])];
+  const lbl = ((typeof S.hoja.escala === 'number' ? S.hoja.escala : 1000) * 2.5) / 1000;
+  g(0, 'SECTION'); g(2, 'HEADER'); g(9, '$ACADVER'); g(1, 'AC1009'); g(0, 'ENDSEC');
+  g(0, 'SECTION'); g(2, 'TABLES'); g(0, 'TABLE'); g(2, 'LTYPE'); g(70, 1); g(0, 'LTYPE'); g(2, 'CONTINUOUS'); g(70, 0); g(3, 'Solid line'); g(72, 65); g(73, 0); g(40, 0); g(0, 'ENDTAB');
+  g(0, 'TABLE'); g(2, 'LAYER'); g(70, layers.length); layers.forEach(([n, c]) => { g(0, 'LAYER'); g(2, n); g(70, 0); g(62, c); g(6, 'CONTINUOUS'); }); g(0, 'ENDTAB'); g(0, 'ENDSEC');
+  g(0, 'SECTION'); g(2, 'ENTITIES');
+  const poly = (layer, ps) => { g(0, 'POLYLINE'); g(8, layer); g(66, 1); g(70, 1); ps.forEach(p => { g(0, 'VERTEX'); g(8, layer); g(10, p.e.toFixed(3)); g(20, p.n.toFixed(3)); g(30, 0); }); g(0, 'SEQEND'); g(8, layer); };
+  S.lotes.forEach(l => { const ps = ringPts(l); if (ps.length > 2) poly('LOTE_' + lay(l.nombre), ps); });
+  const m = ptMap(), cyc = boundaryCycle(null, true); if (cyc.length > 2) poly('PERIMETRO', cyc.map(i => m.get(i)));
+  S.puntos.forEach(p => { g(0, 'POINT'); g(8, 'PUNTOS'); g(10, p.e.toFixed(3)); g(20, p.n.toFixed(3)); g(30, 0); g(0, 'TEXT'); g(8, 'ETIQUETAS'); g(10, (p.e + lbl * .6).toFixed(3)); g(20, (p.n + lbl * .6).toFixed(3)); g(30, 0); g(40, lbl.toFixed(3)); g(1, clean(p.nombre)); });
+  S.lotes.forEach(l => { const ps = ringPts(l); if (ps.length < 3) return; const c = l.lx != null ? { e: l.lx, n: l.ly } : centroid(ps); g(0, 'TEXT'); g(8, 'ETIQUETAS'); g(10, c.e.toFixed(3)); g(20, c.n.toFixed(3)); g(30, 0); g(40, (lbl * 1.2).toFixed(3)); g(1, clean(l.nombre) + '  ' + fmt(lotArea(l)) + ' m2'); if (l.lrot) { g(50, l.lrot); } });
+  g(0, 'ENDSEC'); g(0, 'EOF');
+  return out.join('\r\n') + '\r\n';
+}
+
+// ---------- hoja (SVG en milímetros) ----------
+const PAPEL = { tabloide: [431.8, 279.4, 'Tabloide 11×17 in'], a3: [420, 297, 'A3'], carta: [279.4, 215.9, 'Carta'], a4: [297, 210, 'A4'] };
+const ESCALAS = [100, 200, 250, 300, 400, 500, 600, 750, 1000, 1250, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000];
+function buildSheet() {
+  const h = S.hoja, [W, H] = PAPEL[h.papel] || PAPEL.tabloide, M = 10, titleH = 27, noteH = 13, tw = h.tablas ? Math.round(W * 0.285) : 0;
+  const mx = M, my = M + titleH, mw = W - 2 * M - (tw ? tw + 6 : 0), mh = H - 2 * M - titleH - noteH, tx = mx + mw + 6;
+  const m = ptMap(), pts = S.puntos, b = bbox(pts) || { e0: 0, e1: 10, n0: 0, n1: 10 };
+  const ew = Math.max(b.e1 - b.e0, 1), nh = Math.max(b.n1 - b.n0, 1);
+  let sc = h.escala === 'auto' ? (ESCALAS.find(s => ew * 1000 / s * 1.12 <= mw && nh * 1000 / s * 1.12 <= mh) || 10000) : +h.escala, warn = '';
+  if (h.escala !== 'auto' && (ew * 1000 / sc > mw || nh * 1000 / sc > mh)) warn = `El dibujo no cabe a 1:${sc}; usa una escala menor o un papel más grande.`;
+  const cE = (b.e0 + b.e1) / 2, cN = (b.n0 + b.n1) / 2, k = 1000 / sc;
+  const X = e => mx + mw / 2 + (e - cE) * k, Y = n => my + mh / 2 - (n - cN) * k;
+  const o = [], T = (x, y, s, size, a = {}) => o.push(`<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${size}" ${a.w ? `font-weight="${a.w}"` : ''} ${a.anchor ? `text-anchor="${a.anchor}"` : ''} ${a.fill ? `fill="${a.fill}"` : ''} ${a.rot ? `transform="rotate(${a.rot} ${x.toFixed(2)} ${y.toFixed(2)})"` : ''} ${a.halo ? 'paint-order="stroke" stroke="#fff" stroke-width="0.7"' : ''}>${esc(s)}</text>`);
+  o.push(`<defs><clipPath id="clipMap"><rect x="${mx}" y="${my}" width="${mw}" height="${mh}"/></clipPath><pattern id="hatch" width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.6" height="1.6" fill="none"/><line x1="0" y1="0" x2="0" y2="1.6" stroke="#2e6da4" stroke-width="0.25"/></pattern></defs>`);
+  o.push(`<rect width="${W}" height="${H}" fill="#fff"/>`);
+  T(M, M + 8, h.titulo || '', 9, { w: 700 }); T(M, M + 15, [h.subtitulo, h.lugar].filter(Boolean).join('  ·  '), 4.4, { fill: '#333' });
+  T(M, M + 21, `Proyección GTM  ·  Datum WGS 84  ·  Coordenadas en metros  ·  ${new Date().toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' })}`, 3.2, { fill: '#555' });
+  o.push(`<line x1="${M}" y1="${M + 24.5}" x2="${W - M}" y2="${M + 24.5}" stroke="#000" stroke-width="0.5"/>`);
+  o.push(`<rect x="${mx}" y="${my}" width="${mw}" height="${mh}" fill="#fff" stroke="#000" stroke-width="0.5"/>`);
+  o.push('<g clip-path="url(#clipMap)">');
+  if (h.rejilla) {
+    const step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000].find(s => s * k >= 18) || 10000;
+    const eMin = cE - mw / 2 / k, eMax = cE + mw / 2 / k, nMin = cN - mh / 2 / k, nMax = cN + mh / 2 / k;
+    for (let e = Math.ceil(eMin / step) * step; e <= eMax; e += step) { o.push(`<line x1="${X(e)}" y1="${my}" x2="${X(e)}" y2="${my + mh}" stroke="#e3e6ea" stroke-width="0.15"/>`); T(X(e), my + mh - 1.2, String(Math.round(e)), 2.2, { anchor: 'middle', fill: '#667' }); }
+    for (let n = Math.ceil(nMin / step) * step; n <= nMax; n += step) { o.push(`<line x1="${mx}" y1="${Y(n)}" x2="${mx + mw}" y2="${Y(n)}" stroke="#e3e6ea" stroke-width="0.15"/>`); T(mx + 1.6, Y(n) - 0.6, String(Math.round(n)), 2.2, { fill: '#667', rot: 0 }); }
+  }
+  for (const l of S.lotes) { const ps = ringPts(l); if (ps.length < 3) continue; const d = ps.map(p => X(p.e).toFixed(2) + ',' + Y(p.n).toFixed(2)).join(' ');
+    o.push(`<polygon points="${d}" fill="${l.color}" fill-opacity="${l.hatch ? .3 : .2}" stroke="${l.color}" stroke-width="0.45" stroke-linejoin="round"/>`); if (l.hatch) o.push(`<polygon points="${d}" fill="url(#hatch)" stroke="none"/>`); }
+  const cyc = boundaryCycle(null, true); let outerArea = 0, outerPer = 0;
+  if (cyc.length > 2) { const cp = cyc.map(i => m.get(i)); outerArea = Math.abs(sArea(cp)); outerPer = perim(cp); o.push(`<polygon points="${cp.map(p => X(p.e).toFixed(2) + ',' + Y(p.n).toFixed(2)).join(' ')}" fill="none" stroke="#000" stroke-width="0.7" stroke-linejoin="round"/>`); }
+  if (h.distancias) for (const ed of uniqueEdges()) { const x1 = X(ed.a.e), y1 = Y(ed.a.n), x2 = X(ed.b.e), y2 = Y(ed.b.n); if (Math.hypot(x2 - x1, y2 - y1) < 9) continue; let ang = deg(Math.atan2(y2 - y1, x2 - x1)); if (ang > 90 || ang < -90) ang += 180; T((x1 + x2) / 2, (y1 + y2) / 2 - 0.9, ed.d.toFixed(2), 2.2, { anchor: 'middle', fill: '#344054', rot: ang.toFixed(1), halo: 1 }); }
+  const ccx = cyc.length ? cyc.reduce((s, i) => s + m.get(i).e, 0) / cyc.length : cE, ccy = cyc.length ? cyc.reduce((s, i) => s + m.get(i).n, 0) / cyc.length : cN, onb = new Set(cyc);
+  for (const p of pts) {
+    const x = X(p.e), y = Y(p.n); o.push(`<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="0.85" fill="#000"/>`);
+    const ang = p.lab != null ? p.lab : onb.has(p.id) ? deg(Math.atan2(p.n - ccy, p.e - ccx)) : 45, c = Math.cos(rad(ang)), s = Math.sin(rad(ang)), rr = 2.2;
+    T(x + rr * c, y - rr * s + 0.9, p.nombre, 2.9, { w: 700, anchor: c > 0.35 ? 'start' : c < -0.35 ? 'end' : 'middle', halo: 1 });
+  }
+  for (const l of S.lotes) { const ps = ringPts(l); if (ps.length < 3) continue; const c = l.lx != null && l.ly != null ? { e: l.lx, n: l.ly } : centroid(ps), x = X(c.e), y = Y(c.n);
+    o.push(`<g transform="rotate(${-(l.lrot || 0)} ${x.toFixed(2)} ${y.toFixed(2)})"><text text-anchor="middle" font-size="3.3" font-weight="700" fill="${dark(l.color)}" paint-order="stroke" stroke="#fff" stroke-width="0.6"><tspan x="${x.toFixed(2)}" y="${(y - 0.4).toFixed(2)}">${esc(l.nombre.toUpperCase())}</tspan><tspan x="${x.toFixed(2)}" y="${(y + 3.6).toFixed(2)}" font-weight="400">${fmt(lotArea(l))} m²</tspan></text></g>`); }
+  o.push('</g>');
+  // norte
+  { const nx = mx + 12, ny = my + 6; o.push(`<polygon points="${nx},${ny} ${nx + 2.6},${ny + 10} ${nx},${ny + 8} ${nx - 2.6},${ny + 10}" fill="#000"/>`); T(nx, ny - 1, 'N', 4.2, { w: 700, anchor: 'middle' }); }
+  // escala gráfica
+  { const nice = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000].find(v => v * k >= 28) || 1000, seg = 5, sl = nice * k / seg, bx = mx + 8, by = my + mh - 10;
+    for (let i = 0; i < seg; i++) o.push(`<rect x="${(bx + i * sl).toFixed(2)}" y="${by}" width="${sl.toFixed(2)}" height="1.6" fill="${i % 2 ? '#fff' : '#000'}" stroke="#000" stroke-width="0.25"/>`);
+    for (let i = 0; i <= seg; i++) T(bx + i * sl, by + 5, String(Math.round(nice * i / seg)), 2.2, { anchor: 'middle' });
+    T(bx + nice * k + 3, by + 1.4, `metros  ·  Escala 1:${sc}`, 2.6); }
+  // cuadros
+  if (tw) {
+    const rows = [...S.puntos].sort(natCmp), lotsN = S.lotes.length; const avail = H - M - noteH - my + 4;
+    const need = 6 + (rows.length + 2) * 3.3 + 6 + lotsN * 12.5 + 6 + 16; const f = Math.min(1, avail / need), rh = 3.3 * f, fs = 2.45 * f + 0.15, hs = 3.4;
+    let y = my + 2;
+    T(tx, y + 2, 'CUADRO DE COORDENADAS', hs, { w: 700 }); y += 6;
+    const cx = [tx, tx + tw * 0.31, tx + tw * 0.55, tx + tw * 0.59];
+    T(cx[0], y, 'PTO', fs, { w: 700 }); T(cx[1], y, 'ESTE', fs, { w: 700, anchor: 'end' }); T(cx[2], y, 'NORTE', fs, { w: 700, anchor: 'end' }); T(cx[3], y, 'ORIGEN', fs, { w: 700 }); y += rh;
+    rows.forEach(p => { T(cx[0], y, p.nombre, fs); T(cx[1], y, p.e.toFixed(2), fs, { anchor: 'end' }); T(cx[2], y, p.n.toFixed(2), fs, { anchor: 'end' }); T(cx[3], y, (p.origen || '').slice(0, 34), fs * 0.8, { fill: '#444' }); y += rh; });
+    y += 4; T(tx, y, 'CUADRO DE LOTES', hs, { w: 700 }); y += 5.5;
+    const wrap = (txt, n) => { const w = txt.split('-'), L = []; let cur = ''; w.forEach(s => { if ((cur + '-' + s).length > n && cur) { L.push(cur); cur = s; } else cur = cur ? cur + '-' + s : s; }); if (cur) L.push(cur); return L; };
+    for (const l of S.lotes) { const a = lotArea(l), ps = ringPts(l);
+      T(tx, y, l.nombre, fs + 0.3, { w: 700, fill: dark(l.color, 0.8) }); y += rh;
+      T(tx, y, `Área ${fmt(a)} m²  (${(a / 10000).toFixed(5)} ha · ${fmt(a / VARA2, 0)} v²)  Perím. ${fmt(perim(ps))} m`, fs * 0.95); y += rh;
+      wrap(l.pts.map(i => m.get(i) ? m.get(i).nombre : '?').join('-'), Math.floor(tw / (fs * 0.5))).forEach((ln, i) => { T(tx, y, (i ? '' : 'Puntos: ') + ln, fs * 0.9, { fill: '#444' }); y += rh * 0.88; }); y += 1.5; }
+    if (outerArea) { y += 2; T(tx, y, 'POLÍGONO EXTERIOR (TOTAL)', hs, { w: 700 }); y += 5; T(tx, y, `Área ${fmt(outerArea)} m²  (${(outerArea / 10000).toFixed(5)} ha · ${fmt(outerArea / VARA2, 0)} v²)  Perím. ${fmt(outerPer)} m`, fs * 0.95); y += rh;
+      wrap(cyc.map(i => m.get(i).nombre).join('-'), Math.floor(tw / (fs * 0.5))).forEach((ln, i) => { T(tx, y, (i ? '' : 'Puntos: ') + ln, fs * 0.9, { fill: '#444' }); y += rh * 0.88; }); }
+  }
+  const nota = (h.nota || '').trim(); if (nota) { const words = nota.split(/\s+/), lines = []; let cur = ''; const max = Math.floor((W - 2 * M) / 1.45); words.forEach(w => { if ((cur + ' ' + w).length > max) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }); if (cur) lines.push(cur); lines.slice(0, 3).forEach((ln, i) => T(M, H - M - noteH + 4 + i * 3.4, (i ? '' : 'Notas: ') + ln, 2.5, { fill: '#444' })); }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}mm" height="${H}mm" font-family="Helvetica, Arial, sans-serif">${o.join('\n')}</svg>`;
+  return { svg, W, H, sc, warn };
+}
+let lastSheet = null;
+function openSheet() { lastSheet = buildSheet(); $('#sheetWrap').innerHTML = lastSheet.svg; $('#sheetModal').classList.add('on'); document.body.classList.add('sheetopen'); if (lastSheet.warn) toast(lastSheet.warn); }
+function closeSheet() { $('#sheetModal').classList.remove('on'); document.body.classList.remove('sheetopen'); }
+function exportPNG() {
+  const sh = buildSheet(), dpi = 200, pxW = Math.round(sh.W / 25.4 * dpi), pxH = Math.round(sh.H / 25.4 * dpi), img = new Image();
+  img.onload = () => { const c = document.createElement('canvas'); c.width = pxW; c.height = pxH; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, pxW, pxH); x.drawImage(img, 0, 0, pxW, pxH); c.toBlob(b => download(fname('png'), 'image/png', b), 'image/png'); };
+  img.onerror = () => toast('No se pudo generar el PNG en este navegador; usa SVG o PDF'); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(sh.svg);
+}
+function printPDF() { const sh = buildSheet(); $('#pagecss').textContent = `@page{size:${sh.W}mm ${sh.H}mm;margin:0}`; setTimeout(() => window.print(), 60); }
+
+// ---------- arranque ----------
+$('#bOpen').onclick = () => $('#fileIn').click();
+$('#fileIn').onchange = ev => { const f = ev.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => openText(f.name, String(r.result)); r.readAsText(f); ev.target.value = ''; };
+$('#bSave').onclick = () => { download(fname('json'), 'application/json', projectJSON()); toast('Proyecto guardado'); };
+$('#bNew').onclick = () => { if (!confirm('¿Empezar un proyecto nuevo? (Guarda antes el actual si lo necesitas)')) return; snapshot(); S = emptyProject(); sel.pt = sel.lot = null; renumPreview = null; persist(); renderAll(); fitView(); setMode('mover'); };
+$('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#bSheet').onclick = openSheet;
+$('#bFit').onclick = () => { fitView(); drawCanvas(); };
+$('#bZin').onclick = () => { V.k = Math.min(V.k * 1.4, 400); drawCanvas(); }; $('#bZout').onclick = () => { V.k = Math.max(V.k / 1.4, 0.05); drawCanvas(); };
+$('#xClose').onclick = closeSheet; $('#xPdf').onclick = printPDF; $('#xPng').onclick = exportPNG;
+$('#xSvg').onclick = () => download(fname('svg'), 'image/svg+xml', buildSheet().svg);
+$('#xDxf').onclick = () => download(fname('dxf'), 'application/dxf', toDXF());
+$('#xKml').onclick = () => download(fname('kml'), 'application/vnd.google-earth.kml+xml', toKML());
+$('#xCsv').onclick = () => download(fname('csv'), 'text/csv', toCSV());
+$('#xJson').onclick = () => download(fname('json'), 'application/json', projectJSON());
+window.addEventListener('resize', () => drawCanvas());
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { const r = new FileReader(); r.onload = () => openText(f.name, String(r.result)); r.readAsText(f); } });
+(function init() {
+  try { const raw = localStorage.getItem(LS); if (raw) S = normalize(JSON.parse(raw)); } catch (e) { S = emptyProject(); }
+  renderAll(); fitView(); setMode('mover'); drawCanvas(); updUndo();
+  if (!S.puntos.length) $('#status').textContent = 'Proyecto vacío: usa «Abrir…» para cargar tu proyecto (.json), un KML o un CSV, o agrega puntos con ＋ Punto.';
+})();
+</script>
+</body>
+</html>
