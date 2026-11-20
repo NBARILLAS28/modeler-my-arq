@@ -66,6 +66,20 @@ button.x{padding:2px 8px;min-height:28px;color:var(--red)}
 #sheetModal .mbar span{color:#fff;font-weight:700;margin-right:auto}
 #sheetWrap{flex:1;overflow:auto;padding:12px;text-align:center}
 #sheetWrap svg{background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.4);max-width:100%;height:auto}
+#tramModal{position:fixed;inset:0;background:rgba(20,28,40,.78);z-index:41;display:none;flex-direction:column}
+#tramModal.on{display:flex}
+#tramModal .mbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:var(--hd);align-items:center}
+#tramModal .mbar span{color:#fff;font-weight:700;margin-right:auto}
+#tramBody{flex:1;display:flex;min-height:0}
+#tramPanel{width:390px;max-width:46vw;background:var(--pan);overflow:auto;padding:10px;flex:none}
+#tramWrap{flex:1;overflow:auto;padding:12px;text-align:center}
+.tpage{display:inline-block;margin:0 6px 12px;vertical-align:top}
+.tpage svg{background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.4);width:100%;max-width:660px;height:auto;display:block}
+@media (max-width:820px){
+  #tramBody{flex-direction:column}
+  #tramPanel{width:100%;max-width:none;max-height:42vh}
+  .tpage{display:block}
+}
 @media (max-width:820px){
   header{gap:4px;padding:5px 6px}
   header h1 small{display:none}
@@ -78,6 +92,14 @@ button.x{padding:2px 8px;min-height:28px;color:var(--red)}
   input,select,textarea{font-size:16px!important}
 }
 @media print{
+  body.tramopen>*:not(#tramModal){display:none!important}
+  #tramModal{position:static!important;display:block!important;background:none!important}
+  #tramModal .mbar,#tramPanel{display:none!important}
+  #tramBody{display:block!important}
+  #tramWrap{overflow:visible!important;padding:0!important;text-align:left!important}
+  .tpage{display:block!important;margin:0!important;height:330.1mm;overflow:hidden;break-after:page;page-break-after:always}
+  .tpage:last-child{break-after:auto;page-break-after:auto}
+  .tpage svg{width:215.9mm!important;height:330.1mm!important;max-width:none!important;box-shadow:none!important}
   body.sheetopen>*:not(#sheetModal){display:none!important}
   #sheetModal{position:static!important;display:block!important;background:none!important}
   #sheetModal .mbar{display:none!important}
@@ -97,6 +119,7 @@ button.x{padding:2px 8px;min-height:28px;color:var(--red)}
   <button id="bRedo" title="Rehacer (Ctrl/Cmd+Shift+Z)">↷</button>
   <button id="bNew" title="Proyecto nuevo">Nuevo</button>
   <span class="sp"></span>
+  <button id="bTram" title="Plano de ubicación en formato de trámites (Oficio vertical)">PDF para trámites</button>
   <button id="bSheet" class="pri">Ver plano / Exportar</button>
   <input type="file" id="fileIn" accept=".json,.kml,.csv,.txt,application/json" hidden>
 </header>
@@ -131,6 +154,7 @@ button.x{padding:2px 8px;min-height:28px;color:var(--red)}
   <div class="mbar">
     <span>Plano completo</span>
     <button id="xPdf" class="pri">PDF (imprimir)</button>
+    <button id="xTram">PDF para trámites</button>
     <button id="xPng">PNG</button>
     <button id="xSvg">SVG</button>
     <button id="xDxf">DXF</button>
@@ -140,6 +164,15 @@ button.x{padding:2px 8px;min-height:28px;color:var(--red)}
     <button id="xClose">Cerrar</button>
   </div>
   <div id="sheetWrap"></div>
+</div>
+<div id="tramModal">
+  <div class="mbar">
+    <span>PDF para trámites · Plano de ubicación (Oficio)</span>
+    <button id="tPdf" class="pri">PDF (imprimir)</button>
+    <button id="tPng">PNG</button>
+    <button id="tClose">Cerrar</button>
+  </div>
+  <div id="tramBody"><div id="tramPanel"></div><div id="tramWrap"></div></div>
 </div>
 <div id="toast"></div>
 
@@ -177,7 +210,9 @@ const TM = (() => {
   };
 })();
 const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
-function dark(c, f = 0.62) { const m = /^#?([0-9a-f]{6})$/i.exec(c || ''); if (!m) return '#222'; const n = parseInt(m[1], 16); return '#' + [16, 8, 0].map(sh => Math.round(((n >> sh) & 255) * f).toString(16).padStart(2, '0')).join(''); }
+function lum(c) { const m = /^#?([0-9a-f]{6})$/i.exec(c || ''); if (!m) return 0; const n = parseInt(m[1], 16); return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; }
+const edgeCol = c => lum(c) > 0.82 ? '#6b6b6b' : c;
+function dark(c, f = 0.62) { if (lum(c) > 0.82) return '#333'; const m = /^#?([0-9a-f]{6})$/i.exec(c || ''); if (!m) return '#222'; const n = parseInt(m[1], 16); return '#' + [16, 8, 0].map(sh => Math.round(((n >> sh) & 255) * f).toString(16).padStart(2, '0')).join(''); }
 function llToGtm(lon, lat) {
   const n = TM.n, phi = rad(lat), lam = rad(lon - GTM.lon0), s = Math.sin(phi);
   const c = 2 * Math.sqrt(n) / (1 + n);
@@ -210,14 +245,16 @@ const natCmp = (a, b) => { const x = natKey(a.nombre), y = natKey(b.nombre); ret
 const dedupeRing = r => { const o = []; for (const id of r) if (o[o.length - 1] !== id) o.push(id); if (o.length > 1 && o[0] === o[o.length - 1]) o.pop(); return o; };
 
 // ---------- modelo ----------
+function tramDef() { return { lotes: null, propietario: '', ubicacion: '', naturaleza: 'Rústica', fecha: '', escala: 'auto', numeracion: 'cero', coordenadas: '', varas: false, colind: {} }; }
 function emptyProject() {
-  return { formato: 'modeler-my-arq', version: 1, nombre: 'Proyecto nuevo', crs: { tipo: 'GTM', datum: 'WGS84' }, puntos: [], lotes: [], nextId: 1,
+  return { formato: 'modeler-my-arq', version: 1, nombre: 'Proyecto nuevo', crs: { tipo: 'GTM', datum: 'WGS84' }, puntos: [], lotes: [], nextId: 1, tramite: tramDef(),
     hoja: { titulo: 'PLANO', subtitulo: '', lugar: '', papel: 'tabloide', escala: 'auto', tablas: true, distancias: false, rejilla: true,
       nota: 'Plano de referencia: no sustituye un levantamiento topográfico firmado.' } };
 }
 function normalize(o) {
   const b = emptyProject(); const S = Object.assign(b, o || {});
   S.hoja = Object.assign(b.hoja, (o && o.hoja) || {});
+  S.tramite = Object.assign(tramDef(), (o && o.tramite) || {}); S.tramite.colind = Object.assign({}, S.tramite.colind || {});
   S.puntos = (S.puntos || []).map(p => ({ id: +p.id, nombre: String(p.nombre), e: +p.e, n: +p.n, origen: p.origen || '', antes: p.antes || '', nota: p.nota || '', lab: p.lab == null || p.lab === '' ? null : +p.lab }));
   S.lotes = (S.lotes || []).map((l, i) => ({ id: String(l.id != null ? l.id : 'L' + (i + 1)), nombre: l.nombre || 'Lote ' + (i + 1), color: l.color || '#1b57e4', hatch: !!l.hatch, pts: (l.pts || []).map(Number), lx: l.lx == null ? null : +l.lx, ly: l.ly == null ? null : +l.ly, lrot: +l.lrot || 0 }));
   S.nextId = Math.max(S.nextId || 1, ...S.puntos.map(p => p.id + 1), 1);
@@ -239,6 +276,26 @@ function mergePoints(keepId, dropId) {
   if (keepId === dropId) return;
   S.lotes.forEach(l => { l.pts = dedupeRing(l.pts.map(i => i === dropId ? keepId : i)); });
   S.puntos = S.puntos.filter(p => p.id !== dropId);
+}
+// Renombrar con reordenamiento automático: si el nuevo nombre (prefijo+número) ya lo usa otro punto,
+// los demás se recorren para dejarle el lugar (como insertar en una lista). Devuelve cuántos cambiaron.
+const LS_AUTO = 'modeler-my-arq:autoorden';
+let autoOrden = (() => { try { return localStorage.getItem(LS_AUTO) !== '0'; } catch (e) { return true; } })();
+function renameShift(p, v) {
+  const old = p.nombre, a = natKey(old), b = natKey(v), pure = k => k[1] >= 0 && k[2] === '';
+  p.nombre = v;
+  if (!autoOrden || !pure(b)) return 0;
+  const pre = b[0], N = b[1], num = q => { const k = natKey(q.nombre); return pure(k) && k[0] === pre ? k[1] : null; };
+  const others = S.puntos.filter(q => q !== p && num(q) != null);
+  if (!others.some(q => num(q) === N)) return 0;
+  const moves = [];
+  if (pure(a) && a[0] === pre && a[1] < N) {
+    others.filter(q => num(q) > a[1] && num(q) <= N).forEach(q => moves.push([q, num(q) - 1]));   // sube el número: los intermedios bajan
+  } else {
+    let cur = N; for (;;) { const q = others.find(x => num(x) === cur); if (!q) break; moves.push([q, cur + 1]); cur++; }   // inserta: los siguientes suben hasta el primer hueco
+  }
+  moves.forEach(([q, n]) => { q.antes = q.nombre; q.nombre = pre + n; });
+  return moves.length;
 }
 function deletePoint(id) { S.lotes.forEach(l => { l.pts = l.pts.filter(i => i !== id); }); S.puntos = S.puntos.filter(p => p.id !== id); }
 
@@ -333,7 +390,7 @@ function drawCanvas() {
   for (const l of S.lotes) {
     const ps = l.pts.map(i => m.get(i)).filter(Boolean); if (ps.length < 2) continue;
     const d = ps.map(p => w2s(p.e, p.n).map(v => v.toFixed(1)).join(',')).join(' ');
-    out.push(`<polygon data-lot="${esc(l.id)}" points="${d}" fill="${l.color}" fill-opacity="${l.hatch ? .34 : .2}" stroke="${l.color}" stroke-width="${sel.lot === l.id ? 3.2 : 1.8}" stroke-linejoin="round"/>`);
+    out.push(`<polygon data-lot="${esc(l.id)}" points="${d}" fill="${l.color}" fill-opacity="${l.hatch ? .34 : .2}" stroke="${edgeCol(l.color)}" stroke-width="${sel.lot === l.id ? 3.2 : 1.8}" stroke-linejoin="round"/>`);
   }
   const cyc = boundaryCycle(null, true);
   if (cyc.length > 2) out.push(`<polygon points="${cyc.map(i => w2s(m.get(i).e, m.get(i).n).map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#111" stroke-width="2" pointer-events="none"/>`);
@@ -443,6 +500,8 @@ function renderPoints() {
   const el = $('#tab-puntos'), rows = [...S.puntos].sort(natCmp).map(p => `<tr data-id="${p.id}" class="${sel.pt === p.id ? 'sel' : ''}"><td style="width:27%"><input class="nm" data-f="nombre" value="${esc(p.nombre)}"></td><td><input class="n" data-f="e" inputmode="decimal" value="${p.e.toFixed(2)}"></td><td><input class="n" data-f="n" inputmode="decimal" value="${p.n.toFixed(2)}"></td><td style="width:34px"><button class="x" data-act="delpt" title="Eliminar punto">✕</button></td></tr>`).join('');
   el.innerHTML = `<h3>Puntos medidos (${S.puntos.length})</h3>
   <div class="hint">Edita el nombre, el Este o el Norte (metros, GTM). También puedes arrastrar los puntos en el plano.</div>
+  <div class="row"><label><input type="checkbox" id="autoOrd" ${autoOrden ? 'checked' : ''}> Reordenar números al renombrar</label></div>
+  <div class="hint">Si le pones a un punto el nombre de otro (p. ej. P5), los demás se recorren solos (P5→P6, P6→P7…).</div>
   <table><thead><tr><th>Nombre</th><th>Este</th><th>Norte</th><th></th></tr></thead><tbody>${rows}</tbody></table>
   <div class="row"><button data-act="addpt">＋ Agregar punto</button></div>
   <div id="ptdetail"></div>`;
@@ -513,7 +572,7 @@ function renderHoja() {
   <div class="row"><label><input type="checkbox" data-h="distancias" ${h.distancias ? 'checked' : ''}> Mostrar distancias en los lados</label></div>
   <div class="row"><label><input type="checkbox" data-h="rejilla" ${h.rejilla ? 'checked' : ''}> Rejilla de coordenadas</label></div>
   <div class="row"><label style="width:78px;align-self:flex-start">Notas</label><textarea data-h="nota" rows="4" style="flex:1">${esc(h.nota)}</textarea></div>
-  <div class="row"><button class="pri" data-act="opensheet">Ver plano / Exportar</button></div>
+  <div class="row"><button class="pri" data-act="opensheet">Ver plano / Exportar</button> <button data-act="opentram">PDF para trámites</button></div>
   <div class="hint">En el PDF (imprimir) elige «Guardar como PDF», tamaño de papel igual al de la hoja y escala 100 %.</div>`;
 }
 function renderAll() { renderPoints(); renderLots(); renderRenum(); renderHoja(); drawCanvas(); updUndo(); }
@@ -543,12 +602,14 @@ document.addEventListener('click', ev => {
   else if (a === 'rncancel') { renumPreview = null; renderRenum(); }
   else if (a === 'rnapply' && renumPreview) { const rows = renumPreview.rows; mutate(() => { const m = ptMap(); rows.forEach(r => { const p = m.get(r.id); if (p.nombre !== r.nuevo) p.antes = p.nombre; p.nombre = r.nuevo; }); }); renumPreview = null; renderRenum(); toast('Puntos renumerados'); }
   else if (a === 'opensheet') openSheet();
+  else if (a === 'opentram') openTram();
 });
 document.addEventListener('change', ev => {
   const el = ev.target, tr = el.closest('#tab-puntos tr[data-id]');
+  if (el.id === 'autoOrd') { autoOrden = el.checked; try { localStorage.setItem(LS_AUTO, autoOrden ? '1' : '0'); } catch (e) { /* sin almacenamiento */ } return; }
   if (tr && el.dataset.f) {
     const p = getP(+tr.dataset.id), f = el.dataset.f;
-    if (f === 'nombre') { const v = el.value.trim(); if (!v) { el.value = p.nombre; return; } mutate(() => { p.nombre = v; }); }
+    if (f === 'nombre') { const v = el.value.trim(); if (!v) { el.value = p.nombre; return; } if (v === p.nombre) return; let k = 0; mutate(() => { k = renameShift(p, v); }); if (k) toast(`${v} asignado; ${k} punto${k > 1 ? 's' : ''} se reordenó${k > 1 ? 'n' : ''} automáticamente`); }
     else { const v = num(el.value); if (isNaN(v)) { el.value = p[f].toFixed(2); return; } mutate(() => { p[f] = r2(v); }); }
     return;
   }
@@ -569,7 +630,7 @@ document.addEventListener('change', ev => {
 document.addEventListener('keydown', ev => {
   const tag = (ev.target.tagName || '').toLowerCase(); const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z' && !typing) { ev.preventDefault(); ev.shiftKey ? redo() : undo(); }
-  else if (ev.key === 'Escape') { if ($('#sheetModal').classList.contains('on')) closeSheet(); else if (mode === 'lote') finishLot(); else setMode('mover'); }
+  else if (ev.key === 'Escape') { if ($('#tramModal').classList.contains('on')) closeTram(); else if ($('#sheetModal').classList.contains('on')) closeSheet(); else if (mode === 'lote') finishLot(); else setMode('mover'); }
 });
 
 // ---------- importar ----------
@@ -664,7 +725,7 @@ function buildSheet() {
   const cE = (b.e0 + b.e1) / 2, cN = (b.n0 + b.n1) / 2, k = 1000 / sc;
   const X = e => mx + mw / 2 + (e - cE) * k, Y = n => my + mh / 2 - (n - cN) * k;
   const o = [], T = (x, y, s, size, a = {}) => o.push(`<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${size}" ${a.w ? `font-weight="${a.w}"` : ''} ${a.anchor ? `text-anchor="${a.anchor}"` : ''} ${a.fill ? `fill="${a.fill}"` : ''} ${a.rot ? `transform="rotate(${a.rot} ${x.toFixed(2)} ${y.toFixed(2)})"` : ''} ${a.halo ? 'paint-order="stroke" stroke="#fff" stroke-width="0.7"' : ''}>${esc(s)}</text>`);
-  o.push(`<defs><clipPath id="clipMap"><rect x="${mx}" y="${my}" width="${mw}" height="${mh}"/></clipPath><pattern id="hatch" width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.6" height="1.6" fill="none"/><line x1="0" y1="0" x2="0" y2="1.6" stroke="#2e6da4" stroke-width="0.25"/></pattern></defs>`);
+  o.push(`<defs><clipPath id="clipMap"><rect x="${mx}" y="${my}" width="${mw}" height="${mh}"/></clipPath><pattern id="hatch" width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.6" height="1.6" fill="none"/><line x1="0" y1="0" x2="0" y2="1.6" stroke="#6b6b6b" stroke-width="0.25"/></pattern></defs>`);
   o.push(`<rect width="${W}" height="${H}" fill="#fff"/>`);
   T(M, M + 8, h.titulo || '', 9, { w: 700 }); T(M, M + 15, [h.subtitulo, h.lugar].filter(Boolean).join('  ·  '), 4.4, { fill: '#333' });
   T(M, M + 21, `Proyección GTM  ·  Datum WGS 84  ·  Coordenadas en metros  ·  ${new Date().toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' })}`, 3.2, { fill: '#555' });
@@ -678,7 +739,7 @@ function buildSheet() {
     for (let n = Math.ceil(nMin / step) * step; n <= nMax; n += step) { o.push(`<line x1="${mx}" y1="${Y(n)}" x2="${mx + mw}" y2="${Y(n)}" stroke="#e3e6ea" stroke-width="0.15"/>`); T(mx + 1.6, Y(n) - 0.6, String(Math.round(n)), 2.2, { fill: '#667', rot: 0 }); }
   }
   for (const l of S.lotes) { const ps = ringPts(l); if (ps.length < 3) continue; const d = ps.map(p => X(p.e).toFixed(2) + ',' + Y(p.n).toFixed(2)).join(' ');
-    o.push(`<polygon points="${d}" fill="${l.color}" fill-opacity="${l.hatch ? .3 : .2}" stroke="${l.color}" stroke-width="0.45" stroke-linejoin="round"/>`); if (l.hatch) o.push(`<polygon points="${d}" fill="url(#hatch)" stroke="none"/>`); }
+    o.push(`<polygon points="${d}" fill="${l.color}" fill-opacity="${l.hatch ? .3 : .2}" stroke="${edgeCol(l.color)}" stroke-width="0.45" stroke-linejoin="round"/>`); if (l.hatch) o.push(`<polygon points="${d}" fill="url(#hatch)" stroke="none"/>`); }
   const cyc = boundaryCycle(null, true); let outerArea = 0, outerPer = 0;
   if (cyc.length > 2) { const cp = cyc.map(i => m.get(i)); outerArea = Math.abs(sArea(cp)); outerPer = perim(cp); o.push(`<polygon points="${cp.map(p => X(p.e).toFixed(2) + ',' + Y(p.n).toFixed(2)).join(' ')}" fill="none" stroke="#000" stroke-width="0.7" stroke-linejoin="round"/>`); }
   if (h.distancias) for (const ed of uniqueEdges()) { const x1 = X(ed.a.e), y1 = Y(ed.a.n), x2 = X(ed.b.e), y2 = Y(ed.b.n); if (Math.hypot(x2 - x1, y2 - y1) < 9) continue; let ang = deg(Math.atan2(y2 - y1, x2 - x1)); if (ang > 90 || ang < -90) ang += 180; T((x1 + x2) / 2, (y1 + y2) / 2 - 0.9, ed.d.toFixed(2), 2.2, { anchor: 'middle', fill: '#344054', rot: ang.toFixed(1), halo: 1 }); }
@@ -689,7 +750,9 @@ function buildSheet() {
     T(x + rr * c, y - rr * s + 0.9, p.nombre, 2.9, { w: 700, anchor: c > 0.35 ? 'start' : c < -0.35 ? 'end' : 'middle', halo: 1 });
   }
   for (const l of S.lotes) { const ps = ringPts(l); if (ps.length < 3) continue; const c = l.lx != null && l.ly != null ? { e: l.lx, n: l.ly } : centroid(ps), x = X(c.e), y = Y(c.n);
-    o.push(`<g transform="rotate(${-(l.lrot || 0)} ${x.toFixed(2)} ${y.toFixed(2)})"><text text-anchor="middle" font-size="3.3" font-weight="700" fill="${dark(l.color)}" paint-order="stroke" stroke="#fff" stroke-width="0.6"><tspan x="${x.toFixed(2)}" y="${(y - 0.4).toFixed(2)}">${esc(l.nombre.toUpperCase())}</tspan><tspan x="${x.toFixed(2)}" y="${(y + 3.6).toFixed(2)}" font-weight="400">${fmt(lotArea(l))} m²</tspan></text></g>`); }
+    const words = l.nombre.toUpperCase().split(/\s+/), nl = []; let cur = ''; words.forEach(w => { if (cur && (cur + ' ' + w).length > 15) { nl.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }); if (cur) nl.push(cur);
+    const y0 = y - 1.8 * nl.length + 1.2, spans = nl.map((t, i) => `<tspan x="${x.toFixed(2)}" y="${(y0 + i * 3.6).toFixed(2)}">${esc(t)}</tspan>`).join('') + `<tspan x="${x.toFixed(2)}" y="${(y0 + nl.length * 3.6).toFixed(2)}" font-weight="400">${fmt(lotArea(l))} m²</tspan>`;
+    o.push(`<g transform="rotate(${-(l.lrot || 0)} ${x.toFixed(2)} ${y.toFixed(2)})"><text text-anchor="middle" font-size="3.3" font-weight="700" fill="${dark(l.color)}" paint-order="stroke" stroke="#fff" stroke-width="0.6">${spans}</text></g>`); }
   o.push('</g>');
   // norte
   { const nx = mx + 12, ny = my + 6; o.push(`<polygon points="${nx},${ny} ${nx + 2.6},${ny + 10} ${nx},${ny + 8} ${nx - 2.6},${ny + 10}" fill="#000"/>`); T(nx, ny - 1, 'N', 4.2, { w: 700, anchor: 'middle' }); }
@@ -730,6 +793,202 @@ function exportPNG() {
 }
 function printPDF() { const sh = buildSheet(); $('#pagecss').textContent = `@page{size:${sh.W}mm ${sh.H}mm;margin:0}`; setTimeout(() => window.print(), 60); }
 
+// ---------- PDF para trámites: «Plano de ubicación» (Oficio vertical, 8.5 × 13 in) ----------
+const OFICIO = [215.9, 330.2];
+const CARD = ['Norte', 'Este', 'Sur', 'Oeste'];
+const cardOf = az => CARD[Math.floor((((az % 360) + 360) % 360 + 45) % 360 / 90)];
+const TRAM_ESC = ['auto', 250, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000, 4000, 5000];
+function tramLotes() { const ids = S.lotes.map(l => l.id), T = S.tramite; return T.lotes ? T.lotes.filter(i => ids.includes(i)) : ids; }
+function todayStr() { const d = new Date(); return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear(); }
+
+// contornos (en sentido horario) de la unión de los lotes elegidos: las aristas compartidas se cancelan
+function boundaryRings(lotIds) {
+  const m = ptMap(), cnt = new Map();
+  for (const l of S.lotes) {
+    if (!lotIds.includes(l.id)) continue;
+    let r = dedupeRing(l.pts).filter(i => m.has(i)); if (r.length < 3) continue;
+    if (sArea(r.map(i => m.get(i))) > 0) r = r.slice().reverse();
+    for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; if (a !== b) cnt.set(a + '>' + b, 1); }
+  }
+  const out = new Map();
+  for (const k of cnt.keys()) { const [a, b] = k.split('>').map(Number); if (cnt.has(b + '>' + a)) continue; if (!out.has(a)) out.set(a, []); out.get(a).push(b); }
+  const heading = (a, b) => Math.atan2(m.get(b).e - m.get(a).e, m.get(b).n - m.get(a).n), used = new Set(), all = [];
+  for (const [a0, list] of out) for (const b0 of list) {
+    if (used.has(a0 + '>' + b0)) continue;
+    const ring = []; let a = a0, b = b0;
+    for (let g = 0; g < 20000; g++) {
+      used.add(a + '>' + b); ring.push(a); if (b === a0) break;
+      const cand = (out.get(b) || []).filter(c => !used.has(b + '>' + c)); if (!cand.length) { ring.length = 0; break; }
+      let best = cand[0];
+      if (cand.length > 1) { const hin = heading(a, b); let bd = -1e9; for (const c of cand) { let d = heading(b, c) - hin; d = Math.atan2(Math.sin(d), Math.cos(d)); if (d > bd) { bd = d; best = c; } } }
+      a = b; b = best;
+    }
+    if (ring.length >= 3) all.push(ring);
+  }
+  const rings = [], holes = [];
+  for (const r of all) (sArea(r.map(i => m.get(i))) < 0 ? rings : holes).push(r);
+  rings.sort((x, y) => Math.abs(sArea(y.map(i => m.get(i)))) - Math.abs(sArea(x.map(i => m.get(i)))));
+  return { rings: rings.map(r => { let s = 0; r.forEach((id, i) => { const p = m.get(id), q = m.get(r[s]); if (p.e < q.e || (p.e === q.e && p.n > q.n)) s = i; }); return r.slice(s).concat(r.slice(0, s)); }), holes: holes.length };
+}
+function autoColind(a, b, lotIds) {
+  for (const l of S.lotes) { if (lotIds.includes(l.id)) continue; const r = dedupeRing(l.pts); for (let i = 0; i < r.length; i++) { const x = r[i], y = r[(i + 1) % r.length]; if ((x === a && y === b) || (x === b && y === a)) return l.nombre; } }
+  return '';
+}
+function colindText(sides) {
+  const by = new Map();
+  for (const s of sides) { if (!s.name) continue; if (!by.has(s.name)) by.set(s.name, {}); const d = cardOf(s.outAz), o = by.get(s.name); o[d] = (o[d] || 0) + s.len; }
+  const items = [...by].map(([name, o]) => { const tot = Object.values(o).reduce((x, y) => x + y, 0), mx = Math.max(...Object.values(o)); return { name, dirs: CARD.filter(c => o[c] && (o[c] >= tot * 0.15 || o[c] === mx)) }; });
+  items.sort((x, y) => CARD.indexOf(x.dirs[0]) - CARD.indexOf(y.dirs[0]));
+  const j = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : a[0];
+  return items.length ? items.map(x => `${j(x.dirs)}: ${x.name}`).join(' | ') : '—';
+}
+function wrapTxt(txt, max) { const w = String(txt).split(/\s+/), L = []; let cur = ''; w.forEach(s => { if (cur && (cur + ' ' + s).length > max) { L.push(cur); cur = s; } else cur = cur ? cur + ' ' + s : s; }); if (cur) L.push(cur); return L.length ? L : ['']; }
+
+function tramPage(ring, pageNo, total, selIds) {
+  const T = S.tramite, m = ptMap(), [W, H] = OFICIO, n = ring.length, pts = ring.map(i => m.get(i));
+  const lab = i => T.numeracion === 'nombre' ? pts[i].nombre : String(i);
+  const area = Math.abs(sArea(pts)), per = perim(pts);
+  const sides = pts.map((a, i) => {
+    const b = pts[(i + 1) % n], dE = b.e - a.e, dN = b.n - a.n, key = ring[i] + '-' + ring[(i + 1) % n], az = (deg(Math.atan2(dE, dN)) + 360) % 360;
+    return { i, key, a, b, dE, dN, len: Math.hypot(dE, dN), az, outAz: (az + 270) % 360, name: key in T.colind ? T.colind[key] : autoColind(ring[i], ring[(i + 1) % n], selIds), from: lab(i), to: lab((i + 1) % n) };
+  });
+  const cen = centroid(pts), [lon, lat] = gtmToLl(cen.e, cen.n);
+  // --- cuadro de datos (altura según líneas) ---
+  const rows = [['UBICACIÓN:', T.ubicacion || S.hoja.lugar || ''], ['PROPIETARIO:', T.propietario || ''], ['ÁREA:', `${fmt(area)} m²   ( ${(area / 10000).toFixed(4)} ha )`]];
+  if (T.varas) rows.push(['ÁREA EN VARAS²:', `${fmt(area / VARA2)} v²   ( ${(area / MANZANA).toFixed(4)} manzanas )`]);
+  rows.push(['PERÍMETRO:', `${per.toFixed(2)} mts`], ['ESCALA:', ''], ['COORDENADAS:', (T.coordenadas || '').trim() || `${lat.toFixed(7)}, ${lon.toFixed(7)}`], ['COLINDANCIAS:', colindText(sides)], ['NATURALEZA:', T.naturaleza || ''], ['FECHA:', T.fecha || todayStr()]);
+  const iEsc = rows.findIndex(r => r[0] === 'ESCALA:'), wrapped = rows.map(r => wrapTxt(r[1], 86)), nLines = wrapped.reduce((s, w) => s + w.length, 0);
+  const boxBottom = H - 10.5, boxH = 5 + nLines * 3.9 + 13, boxTop = boxBottom - boxH;
+  // --- cuadro punto a punto ---
+  const rowH = Math.max(3.6, Math.min(6.3, 96 / (n + 2))), tH = (n + 2) * rowH, tBottom = boxTop - 4, tTop = tBottom - tH, tW = [23.1, 27.7, 25.4], tX = 12.7, tRight = tX + tW[0] + tW[1] + tW[2];
+  // --- escala y ubicación del dibujo ---
+  const b = bbox(pts), cE = (b.e0 + b.e1) / 2, cN = (b.n0 + b.n1) / 2, ew = Math.max(b.e1 - b.e0, 1), nh = Math.max(b.n1 - b.n0, 1), MG = 11;
+  const r1 = { x0: 12 + MG, y0: 34 + MG, x1: W - 12 - MG, y1: tTop - 10 - MG }, r2 = { x0: tRight + 6 + MG, y0: 34 + MG, x1: W - 12 - MG, y1: boxTop - 4 - MG };
+  const inR = (x, y, r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
+  const samples = (k, cx, cy) => { const s = [], X = e => cx + (e - cE) * k, Y = nn => cy - (nn - cN) * k; for (let i = 0; i < n; i++) { const a = pts[i], c = pts[(i + 1) % n], x1 = X(a.e), y1 = Y(a.n), x2 = X(c.e), y2 = Y(c.n), L = Math.hypot(x2 - x1, y2 - y1), st = Math.max(1, Math.ceil(L / 0.8)); for (let j = 0; j < st; j++) s.push([x1 + (x2 - x1) * j / st, y1 + (y2 - y1) * j / st]); } return s; };
+  const okAt = (k, cx, cy) => samples(k, cx, cy).every(([x, y]) => inR(x, y, r1) || inR(x, y, r2));
+  const cands = k => { const w = ew * k, h = nh * k, L = [[(r1.x0 + r1.x1) / 2, (r1.y0 + r1.y1) / 2]]; const yLo = 34 + MG + h / 2, yHi = boxTop - 4 - MG - h / 2, xR = W - 12 - MG - w / 2, xC = (r1.x0 + r1.x1) / 2; if (yHi >= yLo) for (const x of [xC, (xC + xR) / 2, xR]) for (let q = 0; q <= 8; q++) L.push([x, yLo + (yHi - yLo) * q / 8]); return L; };
+  let sc = null, cx0 = 0, cy0 = 0, warn = '';
+  const list = T.escala === 'auto' ? ESCALAS : [+T.escala];
+  for (const s of list) { const k = 1000 / s, c = cands(k).find(([x, y]) => okAt(k, x, y)); if (c) { sc = s; cx0 = c[0]; cy0 = c[1]; break; } }
+  if (sc == null) { sc = T.escala === 'auto' ? 10000 : +T.escala; cx0 = (r1.x0 + r1.x1) / 2; cy0 = (r1.y0 + r1.y1) / 2; warn = `El terreno no cabe a 1:${sc} en la hoja; usa una escala menor.`; }
+  rows[iEsc][1] = `1/${sc} (referencial)`; wrapped[iEsc] = [rows[iEsc][1]];
+  const k = 1000 / sc, X = e => cx0 + (e - cE) * k, Y = nn => cy0 - (nn - cN) * k, P = pts.map(p => [X(p.e), Y(p.n)]);
+  // --- SVG ---
+  const o = [], T_ = (x, y, s, size, a = {}) => o.push(`<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${size}" ${a.w ? `font-weight="${a.w}"` : ''} ${a.anchor ? `text-anchor="${a.anchor}"` : ''} ${a.it ? 'font-family="\'Times New Roman\', Times, serif" font-style="italic"' : ''} ${a.rot ? `transform="rotate(${a.rot.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)})"` : ''}>${esc(s)}</text>`);
+  o.push(`<rect width="${W}" height="${H}" fill="#fff"/><rect x="9" y="9" width="${W - 18}" height="${H - 18}" fill="none" stroke="#000" stroke-width="0.55"/>`);
+  T_(15.2, 19.2, 'PLANO DE UBICACIÓN', 7.6, { w: 700 }); T_(15.2, 26.2, T.ubicacion || S.hoja.lugar || '', 4.2);
+  if (total > 1) T_(15.2, 31.4, `Parcela ${pageNo} de ${total}`, 3.2);
+  { const cx = 193.5, cy = 21.5, R = 5.6; o.push(`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#000" stroke-width="0.45"/><line x1="${cx}" y1="${cy - R}" x2="${cx}" y2="${cy + R}" stroke="#000" stroke-width="0.45"/><line x1="${cx - R}" y1="${cy}" x2="${cx + R}" y2="${cy}" stroke="#000" stroke-width="0.45"/>`);
+    T_(cx, cy - R - 1, 'N', 2.7, { w: 700, anchor: 'middle' }); T_(cx, cy + R + 3.3, 'S', 2.7, { w: 700, anchor: 'middle' }); T_(cx - R - 1.3, cy + 0.95, 'W', 2.7, { w: 700, anchor: 'end' }); T_(cx + R + 1.3, cy + 0.95, 'E', 2.7, { w: 700, anchor: 'start' }); }
+  o.push(`<polygon points="${P.map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ')}" fill="none" stroke="#000" stroke-width="0.8" stroke-linejoin="round"/>`);
+  P.forEach(p => o.push(`<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="0.55" fill="#000"/>`));
+  const bnd = []; for (let i = 0; i < n; i++) { const a = P[i], c = P[(i + 1) % n], L = Math.hypot(c[0] - a[0], c[1] - a[1]), st = Math.max(1, Math.ceil(L / 0.6)); for (let j = 0; j <= st; j++) bnd.push([a[0] + (c[0] - a[0]) * j / st, a[1] + (c[1] - a[1]) * j / st]); }
+  const placed = [], ov = (a, c) => a.x0 < c.x1 && a.x1 > c.x0 && a.y0 < c.y1 && a.y1 > c.y0, hits = r => bnd.some(p => p[0] > r.x0 - .4 && p[0] < r.x1 + .4 && p[1] > r.y0 - .4 && p[1] < r.y1 + .4);
+  const tblRect = { x0: tX - 1, y0: tTop - 9, x1: tRight + 1, y1: tBottom + 1 }, left = u => [-u[1], u[0]];
+  // números de vértice (hacia afuera)
+  for (let i = 0; i < n; i++) {
+    const s0 = sides[(i + n - 1) % n], s1 = sides[i], u1 = [s0.dE / (s0.len || 1), s0.dN / (s0.len || 1)], u2 = [s1.dE / (s1.len || 1), s1.dN / (s1.len || 1)], l1 = left(u1), l2 = left(u2);
+    let v = [l1[0] + l2[0], l1[1] + l2[1]]; const vl = Math.hypot(v[0], v[1]); v = vl < 1e-6 ? l1 : [v[0] / vl, v[1] / vl];
+    const ox = v[0], oy = -v[1], txt = lab(i), w = txt.length * 2.1 + 0.6, h = 3.6, ex = Math.abs(ox) * w / 2 + Math.abs(oy) * h / 2, cx = P[i][0] + ox * (1.6 + ex), cy = P[i][1] + oy * (1.6 + ex);
+    placed.push({ x0: cx - w / 2, x1: cx + w / 2, y0: cy - h / 2, y1: cy + h / 2 }); T_(cx, cy + h * 0.36, txt, 3.6, { w: 700, anchor: 'middle' });
+  }
+  // colindancias (cursiva, paralelas al lado, hacia afuera)
+  let st0 = sides.findIndex((s, i) => s.name !== sides[(i + n - 1) % n].name); if (st0 < 0) st0 = 0;
+  const runs = []; let cur = null;
+  for (let j = 0; j < n; j++) { const s = sides[(st0 + j) % n]; if (!s.name) { cur = null; continue; } if (cur && cur.name === s.name) cur.sides.push(s); else { cur = { name: s.name, sides: [s] }; runs.push(cur); } }
+  for (const r of runs) {
+    const s = r.sides.reduce((a, c) => c.len > a.len ? c : a), x1 = P[s.i][0], y1 = P[s.i][1], x2 = P[(s.i + 1) % n][0], y2 = P[(s.i + 1) % n][1], mx = (x1 + x2) / 2, my = (y1 + y2) / 2, v = left([s.dE / s.len, s.dN / s.len]), ox = v[0], oy = -v[1];
+    let ang = deg(Math.atan2(y2 - y1, x2 - x1)); if (ang > 90 || ang < -90) ang += 180; ang = ((ang + 180) % 360) - 180;
+    const size = 4.2, w = r.name.length * size * 0.44, h = size, ca = Math.abs(Math.cos(rad(ang))), sa = Math.abs(Math.sin(rad(ang))), bw = ca * w + sa * h, bh = sa * w + ca * h, ex = Math.abs(ox) * bw / 2 + Math.abs(oy) * bh / 2, off = 4.5 + ex, cx = mx + ox * off, cy = my + oy * off;
+    placed.push({ x0: cx - bw / 2, x1: cx + bw / 2, y0: cy - bh / 2, y1: cy + bh / 2 }); T_(cx, cy + size * 0.3, r.name, size, { anchor: 'middle', it: true, rot: ang });
+  }
+  // distancias
+  for (const s of sides) {
+    const x1 = P[s.i][0], y1 = P[s.i][1], x2 = P[(s.i + 1) % n][0], y2 = P[(s.i + 1) % n][1], L = Math.hypot(x2 - x1, y2 - y1), mx = (x1 + x2) / 2, my = (y1 + y2) / 2, v = left([s.dE / s.len, s.dN / s.len]), ox = v[0], oy = -v[1];
+    const txt = s.len.toFixed(2) + ' mts', w = txt.length * 2.9 * 0.53, h = 2.9, dirs = L >= 20 ? [-1, 1] : [1, -1], ex = Math.abs(ox) * w / 2 + Math.abs(oy) * h / 2; let best = null;
+    for (const sg of dirs) for (const off of [1.5, 3.2, 5.5, 8]) {
+      const cx = mx + sg * ox * (off + ex), cy = my + sg * oy * (off + ex), r = { x0: cx - w / 2, x1: cx + w / 2, y0: cy - h / 2, y1: cy + h / 2 };
+      const score = placed.filter(p => ov(p, r)).length * 10 + (hits(r) ? 10 : 0) + (ov(tblRect, r) ? 20 : 0) + (r.x0 < 12 || r.x1 > W - 12 || r.y0 < 34 || r.y1 > boxTop - 2 ? 50 : 0) + off * 0.2 + (sg !== dirs[0] ? 0.6 : 0);
+      if (!best || score < best.score) best = { score, r, cx, cy };
+    }
+    placed.push(best.r); T_(best.cx, best.cy + h * 0.34, txt, h, { anchor: 'middle' });
+  }
+  // extensión punto a punto
+  { const fs = Math.min(3.1, rowH * 0.5), cxs = [tX, tX + tW[0], tX + tW[0] + tW[1], tRight];
+    T_(15.2, tTop - 3.6, 'EXTENSIÓN PUNTO A PUNTO', 4.5, { w: 700 });
+    for (let r = 0; r <= n + 2; r++) o.push(`<line x1="${tX}" y1="${(tTop + r * rowH).toFixed(2)}" x2="${tRight}" y2="${(tTop + r * rowH).toFixed(2)}" stroke="#000" stroke-width="0.3"/>`);
+    cxs.forEach(x => o.push(`<line x1="${x.toFixed(2)}" y1="${tTop}" x2="${x.toFixed(2)}" y2="${tBottom}" stroke="#000" stroke-width="0.3"/>`));
+    const mid = i => [(cxs[i] + cxs[i + 1]) / 2, 0], base = r => tTop + r * rowH + rowH / 2 + fs * 0.35;
+    ['EST-AMP', 'DISTANCIA', 'AZIMUT'].forEach((t, i) => T_(mid(i)[0], base(0), t, fs, { w: 700, anchor: 'middle' }));
+    sides.forEach((s, r) => { T_(mid(0)[0], base(r + 1), `${s.from}-${s.to}`, fs, { anchor: 'middle' }); T_(mid(1)[0], base(r + 1), `${s.len.toFixed(2)} mts`, fs, { anchor: 'middle' }); T_(mid(2)[0], base(r + 1), `${s.az.toFixed(1)}°`, fs, { anchor: 'middle' }); });
+    T_(mid(0)[0], base(n + 1), 'TOTAL', fs, { w: 700, anchor: 'middle' }); T_(mid(1)[0], base(n + 1), `${per.toFixed(2)} mts`, fs, { w: 700, anchor: 'middle' }); }
+  // cuadro de datos + firma
+  o.push(`<rect x="12.5" y="${boxTop.toFixed(2)}" width="${W - 25}" height="${boxH.toFixed(2)}" fill="none" stroke="#000" stroke-width="0.35"/>`);
+  { let y = boxTop + 5.2; rows.forEach((r, i) => { T_(15.2, y, r[0], 3.3, { w: 700 }); wrapped[i].forEach((ln, j) => { T_(53, y + j * 3.9, ln, 3.3); }); y += wrapped[i].length * 3.9; });
+    o.push(`<line x1="15.7" y1="${(boxBottom - 6.2).toFixed(2)}" x2="71.8" y2="${(boxBottom - 6.2).toFixed(2)}" stroke="#000" stroke-width="0.3"/>`); T_(16.5, boxBottom - 2.6, 'Nombre y firma - Arquitecto/Ingeniero colegiado responsable', 2.6); }
+  return { svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}mm" height="${H}mm" font-family="Arial, Helvetica, sans-serif">${o.join('\n')}</svg>`, sc, warn, area, per, n };
+}
+function buildTram() {
+  const ids = tramLotes(); if (!ids.length) return { pages: [], rings: [], holes: 0, ids, warn: 'Elige al menos un lote.' };
+  const { rings, holes } = boundaryRings(ids), pages = rings.map((r, i) => tramPage(r, i + 1, rings.length, ids));
+  return { pages, rings, holes, ids, warn: pages.map(p => p.warn).filter(Boolean)[0] || (holes ? 'La selección tiene un hueco interior (se ignora).' : (!rings.length ? 'Los lotes elegidos no forman un contorno cerrado.' : '')) };
+}
+let tramLast = null;
+function renderTramPreview() { tramLast = buildTram(); $('#tramWrap').innerHTML = tramLast.pages.map(p => `<div class="tpage">${p.svg}</div>`).join('') || `<div class="hint" style="color:#fff;padding:20px">${esc(tramLast.warn)}</div>`; const w = $('#tramWarn'); if (w) w.textContent = tramLast.warn || ''; }
+function renderTramPanel() {
+  const T = S.tramite, ids = tramLotes(), b = buildTram(), esc2 = TRAM_ESC.map(v => `<option value="${v}" ${String(T.escala) === String(v) ? 'selected' : ''}>${v === 'auto' ? 'Automática' : '1/' + v}</option>`).join('');
+  let h = `<h3>Propiedad que se dibuja</h3><div class="hint">Marca los lotes que forman la propiedad. Los lados compartidos entre lotes marcados desaparecen y queda solo el contorno. Si las partes no se tocan, sale una hoja por cada una.</div>`;
+  h += S.lotes.map(l => `<div class="row"><label><input type="checkbox" data-t="lote" data-id="${esc(l.id)}" ${ids.includes(l.id) ? 'checked' : ''}> <b>${esc(l.nombre)}</b> <span class="hint">${fmt(lotArea(l))} m²</span></label></div>`).join('');
+  h += `<div id="tramWarn" class="hint" style="color:#c0392b">${esc(b.warn || '')}</div>
+  <h3>Datos del plano</h3>
+  <div class="row"><label style="width:92px">Propietario</label><input data-t="propietario" value="${esc(T.propietario)}" style="flex:1" placeholder="Nombre del propietario"></div>
+  <div class="row"><label style="width:92px">Ubicación</label><input data-t="ubicacion" value="${esc(T.ubicacion)}" style="flex:1" placeholder="${esc(S.hoja.lugar || 'Aldea, municipio, departamento')}"></div>
+  <div class="row"><label style="width:92px">Naturaleza</label><input data-t="naturaleza" list="tramNat" value="${esc(T.naturaleza)}" style="flex:1"><datalist id="tramNat"><option>Rústica</option><option>Urbana</option></datalist></div>
+  <div class="row"><label style="width:92px">Fecha</label><input data-t="fecha" value="${esc(T.fecha)}" style="flex:1" placeholder="${todayStr()} (hoy)"></div>
+  <div class="row"><label style="width:92px">Coordenadas</label><input data-t="coordenadas" value="${esc(T.coordenadas)}" style="flex:1" placeholder="Automáticas (centro, lat, lon)"></div>
+  <div class="row"><label style="width:92px">Escala</label><select data-t="escala" style="flex:1">${esc2}</select></div>
+  <div class="row"><label style="width:92px">Vértices</label><select data-t="numeracion" style="flex:1"><option value="cero" ${T.numeracion === 'cero' ? 'selected' : ''}>0, 1, 2… (desde el más al oeste)</option><option value="nombre" ${T.numeracion === 'nombre' ? 'selected' : ''}>Nombres del proyecto (P1, P2…)</option></select></div>
+  <div class="row"><label><input type="checkbox" data-t="varas" ${T.varas ? 'checked' : ''}> Mostrar también el área en varas² y manzanas</label></div>
+  <h3>Colindancias por lado</h3><div class="hint">Escribe con quién colinda cada lado (se dibuja junto al lado y se resume por rumbo). Los lados que comparten límite con un lote que no marcaste se llenan solos.</div>`;
+  b.rings.forEach((ring, ri) => {
+    const m = ptMap(), pts = ring.map(i => m.get(i)), n = ring.length;
+    if (b.rings.length > 1) h += `<div class="hint" style="margin-top:8px"><b>Parcela ${ri + 1}</b></div>`;
+    h += '<table>' + ring.map((id, i) => { const key = id + '-' + ring[(i + 1) % n], a = pts[i], c = pts[(i + 1) % n], len = Math.hypot(c.e - a.e, c.n - a.n), val = key in T.colind ? T.colind[key] : autoColind(id, ring[(i + 1) % n], b.ids), nm = x => T.numeracion === 'nombre' ? pts[x % n].nombre : String(x % n);
+      return `<tr><td style="white-space:nowrap;width:1%"><b>${esc(nm(i))}-${esc(nm(i + 1))}</b></td><td style="white-space:nowrap;width:1%;text-align:right;padding-right:6px" class="hint">${len.toFixed(2)} m</td><td><input data-t="colind" data-key="${key}" value="${esc(val)}" placeholder="Colinda con…"></td></tr>`; }).join('') + '</table>';
+  });
+  $('#tramPanel').innerHTML = h;
+}
+function openTram() {
+  if (!S.lotes.length) { toast('Primero agrega o abre un proyecto con lotes'); return; }
+  closeSheet(); renderTramPanel(); renderTramPreview(); $('#tramModal').classList.add('on'); document.body.classList.add('tramopen');
+}
+function closeTram() { $('#tramModal').classList.remove('on'); document.body.classList.remove('tramopen'); }
+function printTram() { if (!tramLast || !tramLast.pages.length) { toast('No hay nada que imprimir'); return; } $('#pagecss').textContent = `@page{size:${OFICIO[0]}mm ${OFICIO[1]}mm;margin:0}`; setTimeout(() => window.print(), 60); }
+function exportTramPNG() {
+  const pages = (tramLast && tramLast.pages) || []; if (!pages.length) return;
+  pages.forEach((p, i) => { const dpi = 200, pxW = Math.round(OFICIO[0] / 25.4 * dpi), pxH = Math.round(OFICIO[1] / 25.4 * dpi), img = new Image();
+    img.onload = () => { const c = document.createElement('canvas'); c.width = pxW; c.height = pxH; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, pxW, pxH); x.drawImage(img, 0, 0, pxW, pxH); c.toBlob(bl => download(fname('png').replace(/\.png$/, `_tramite${pages.length > 1 ? '_' + (i + 1) : ''}.png`), 'image/png', bl), 'image/png'); };
+    img.onerror = () => toast('No se pudo generar el PNG en este navegador; usa PDF'); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(p.svg); });
+}
+(function tramEvents() {
+  const pn = () => $('#tramPanel');
+  const onInput = ev => {
+    const el = ev.target, f = el.dataset.t; if (!f) return; const T = S.tramite;
+    if (f === 'colind') T.colind[el.dataset.key] = el.value;
+    else if (['propietario', 'ubicacion', 'naturaleza', 'fecha', 'coordenadas'].includes(f)) T[f] = el.value;
+    else return; persist(); renderTramPreview();
+  };
+  document.addEventListener('input', ev => { if (ev.target.closest && ev.target.closest('#tramPanel')) onInput(ev); });
+  document.addEventListener('change', ev => {
+    const el = ev.target; if (!el.closest || !el.closest('#tramPanel') || !el.dataset.t) return; const f = el.dataset.t, T = S.tramite;
+    if (f === 'lote') { const cur = tramLotes(), id = el.dataset.id; T.lotes = el.checked ? [...new Set([...cur, id])] : cur.filter(x => x !== id); persist(); renderTramPanel(); renderTramPreview(); }
+    else if (f === 'escala') { T.escala = el.value === 'auto' ? 'auto' : +el.value; persist(); renderTramPreview(); }
+    else if (f === 'numeracion') { T.numeracion = el.value; persist(); renderTramPanel(); renderTramPreview(); }
+    else if (f === 'varas') { T.varas = el.checked; persist(); renderTramPreview(); }
+  });
+})();
+
 // ---------- arranque ----------
 $('#bOpen').onclick = () => $('#fileIn').click();
 $('#fileIn').onchange = ev => { const f = ev.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => openText(f.name, String(r.result)); r.readAsText(f); ev.target.value = ''; };
@@ -738,6 +997,7 @@ $('#bNew').onclick = () => { if (!confirm('¿Empezar un proyecto nuevo? (Guarda 
 $('#bUndo').onclick = undo; $('#bRedo').onclick = redo; $('#bSheet').onclick = openSheet;
 $('#bFit').onclick = () => { fitView(); drawCanvas(); };
 $('#bZin').onclick = () => { V.k = Math.min(V.k * 1.4, 400); drawCanvas(); }; $('#bZout').onclick = () => { V.k = Math.max(V.k / 1.4, 0.05); drawCanvas(); };
+$('#bTram').onclick = openTram; $('#xTram').onclick = openTram; $('#tClose').onclick = closeTram; $('#tPdf').onclick = printTram; $('#tPng').onclick = exportTramPNG;
 $('#xClose').onclick = closeSheet; $('#xPdf').onclick = printPDF; $('#xPng').onclick = exportPNG;
 $('#xSvg').onclick = () => download(fname('svg'), 'image/svg+xml', buildSheet().svg);
 $('#xDxf').onclick = () => download(fname('dxf'), 'application/dxf', toDXF());
